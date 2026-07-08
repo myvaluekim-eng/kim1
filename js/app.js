@@ -2642,6 +2642,7 @@ function renderSales() {
         <span class="highlight-label">${monthLabel} 전체 발주</span>
         <span class="highlight-value">${summary.totalCount}<small>건</small></span>
       </div>
+      <div class="highlight-totals">${formatDualCurrencyTotalsHtml(summary.totalKrw, summary.totalUsd)}</div>
     </div>
 
     ${salesChannelId ? renderSalesChannelDetail(salesChannelId, summary, monthLabel) : ""}

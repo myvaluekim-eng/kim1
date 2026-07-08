@@ -404,6 +404,15 @@ function buildSalesSummary(data, yearMonth) {
     (a, b) => b.count - a.count || b.totalKrw + b.totalUsd - (a.totalKrw + a.totalUsd)
   );
 
+  const totalKrw = proposals.reduce((sum, p) => {
+    const ch = getChannels(data).find((c) => c.id === p.channelId);
+    return getProposalCurrency(p, ch) === "KRW" ? sum + (p.totalAmount || 0) : sum;
+  }, 0);
+  const totalUsd = proposals.reduce((sum, p) => {
+    const ch = getChannels(data).find((c) => c.id === p.channelId);
+    return getProposalCurrency(p, ch) === "USD" ? sum + (p.totalAmount || 0) : sum;
+  }, 0);
+
   const byChannel = getChannels(data).map((ch) => {
     const channelProposals = proposals.filter((p) => p.channelId === ch.id);
     const totals = { krw: 0, usd: 0 };
@@ -427,6 +436,8 @@ function buildSalesSummary(data, yearMonth) {
   return {
     yearMonth,
     totalCount: proposals.length,
+    totalKrw,
+    totalUsd,
     clients,
     byChannel,
     proposals,

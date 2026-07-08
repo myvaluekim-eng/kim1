@@ -1339,6 +1339,17 @@ td.total-row {
   font-size: 18px;
   font-weight: 600;
   color: var(--text-muted);
+}
+
+.highlight-totals {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.6;
+  text-align: right;
+}
   margin-left: 4px;
 }
 
