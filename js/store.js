@@ -61,6 +61,9 @@ function migrateData(data) {
     initChannelSrpForProduct(data, p.code);
     getChannels(data).forEach((ch) => {
       data.channelSrp[p.code][ch.id] = normalizeSrpEntry(data.channelSrp[p.code][ch.id]);
+      const entry = data.channelSrp[p.code][ch.id];
+      if (entry.usd == null && p.srpUsd != null) entry.usd = p.srpUsd;
+      if (entry.krw == null && p.srpKrw != null) entry.krw = p.srpKrw;
     });
   });
   if (!data.exchangeRate) data.exchangeRate = DEFAULT_EXCHANGE_RATE;

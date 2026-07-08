@@ -1085,11 +1085,43 @@ function formatPoManualMoney(amount) {
   return poUploadState.manualPriceCurrency === "KRW" ? formatKrw(amount) : formatUsd(amount);
 }
 
-function createPoManualItem(code) {
+function resolvePoManualUnitPriceUsd(product, srp) {
+  if (srp?.usd != null && srp.usd > 0) return srp.usd;
+  if (product?.fobUsd != null && product.fobUsd > 0) return product.fobUsd;
+  if (product?.srpUsd != null && product.srpUsd > 0) return product.srpUsd;
+  return null;
+}
+
+function resolvePoManualUnitPrice(code, currency) {
+  const product = getProducts(appData).find((p) => p.code === code);
   const srp = getChannelSrp(appData, code, poUploadState.channelId);
+  const rate = getPoManualExchangeRate();
+
+  if (currency === "KRW") {
+    if (srp.krw != null && srp.krw > 0) return srp.krw;
+    if (product?.srpKrw != null && product.srpKrw > 0) return product.srpKrw;
+    const usd = resolvePoManualUnitPriceUsd(product, srp);
+    return usd != null ? Math.round(usd * rate) : null;
+  }
+
+  return resolvePoManualUnitPriceUsd(product, srp);
+}
+
+function createPoManualItem(code) {
   const currency = poUploadState.manualPriceCurrency;
-  const unitPrice = currency === "KRW" ? srp.krw : srp.usd;
-  return { qty: 0, unitPrice: unitPrice ?? null, amount: 0 };
+  const unitPrice = resolvePoManualUnitPrice(code, currency);
+  return { qty: 0, unitPrice, amount: 0 };
+}
+
+function ensurePoManualItemDefaults(code) {
+  if (!poUploadState.manualItems[code]) {
+    poUploadState.manualItems[code] = createPoManualItem(code);
+    return;
+  }
+  const currency = poUploadState.manualPriceCurrency;
+  if (poUploadState.manualItems[code].unitPrice == null) {
+    poUploadState.manualItems[code].unitPrice = resolvePoManualUnitPrice(code, currency);
+  }
 }
 
 function addPoManualProduct(code) {
@@ -1111,8 +1143,13 @@ function switchPoManualCurrency(currency) {
   const rate = getPoManualExchangeRate();
   const from = poUploadState.manualPriceCurrency;
   poUploadState.manualSelected.forEach((code) => {
+    ensurePoManualItemDefaults(code);
     const item = poUploadState.manualItems[code];
-    if (!item || item.unitPrice == null) return;
+    if (!item) return;
+    if (item.unitPrice == null) {
+      item.unitPrice = resolvePoManualUnitPrice(code, currency);
+      return;
+    }
     if (from === "USD" && currency === "KRW") {
       item.unitPrice = Math.round(item.unitPrice * rate);
     } else if (from === "KRW" && currency === "USD") {
@@ -1152,6 +1189,7 @@ function renderPoManualSection(channel) {
     .map((code) => {
       const p = products.find((x) => x.code === code);
       if (!p) return "";
+      ensurePoManualItemDefaults(code);
       const item = poUploadState.manualItems[code] || { qty: 0, unitPrice: null, amount: 0 };
       const qty = item.qty || 0;
       const unitPrice = item.unitPrice;
