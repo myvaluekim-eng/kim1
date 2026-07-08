@@ -194,10 +194,10 @@ function buildProposalDocumentHtml(proposal) {
         </colgroup>
         <tbody class="proposal-doc-head">
           <tr class="proposal-doc-head-title">
-            <td colspan="13">PRODUCT &amp; PRICE LIST</td>
-          </tr>
-          <tr class="proposal-doc-head-sub">
-            <td colspan="13">Barle Cosmetics</td>
+            <td colspan="13">
+              <div class="proposal-doc-head-main">PRODUCT &amp; PRICE LIST</div>
+              <div class="proposal-doc-head-subline">Barle Cosmetics</div>
+            </td>
           </tr>
           <tr class="proposal-doc-meta-row">
             <td class="meta-label">Buyer</td>
@@ -216,9 +216,6 @@ function buildProposalDocumentHtml(proposal) {
             <td colspan="3">1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")}</td>
             <td class="meta-label">Total</td>
             <td colspan="5">${formatMoney(totals.totalAmount, channel)}</td>
-          </tr>
-          <tr class="proposal-doc-spacer">
-            <td colspan="13"></td>
           </tr>
         </tbody>
         <thead>
@@ -283,7 +280,7 @@ async function exportProposalToPdf(proposal) {
   try {
     await html2pdf()
       .set({
-        margin: [4, 6, 6, 6],
+        margin: [3, 6, 6, 6],
         filename: getProposalPdfFilename(proposal),
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
