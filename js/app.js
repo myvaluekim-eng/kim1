@@ -281,8 +281,8 @@ const PAGE_META = {
   poupload: { title: "발주서 등록", desc: "발주서 파일(엑셀) 또는 이미지를 올리면 자동으로 인식해 영업 현황에 반영합니다." },
   products: { title: "제품 등록", desc: "새로 출시된 제품을 등록하거나 기존 제품을 관리합니다." },
   master: {
-    title: "채널·업체·거래조건",
-    desc: "판매채널, 거래 업체, 거래 조건(T&C)을 한 화면에서 등록·수정합니다.",
+    title: "거래처 통합 등록",
+    desc: "판매채널, 거래 업체, 거래 조건을 한 화면에서 등록·수정합니다.",
   },
   srp: { title: "소비자가 설정", desc: "채널별 권장 소비자가를 미리 입력해 두면 단가표에 자동으로 채워집니다." },
   history: { title: "지난 단가표", desc: "이전에 저장한 단가표를 다시 확인하거나 엑셀로 다운로드합니다." },
@@ -448,8 +448,8 @@ function renderDashboard() {
       </button>
       <button class="action-card" onclick="openMaster('')">
         <div class="action-icon">🌐</div>
-        <div class="action-title">채널·업체·거래조건</div>
-        <div class="action-desc">판매채널, 거래처, 거래 조건을 한 번에 관리</div>
+        <div class="action-title">거래처 통합 등록</div>
+        <div class="action-desc">채널·업체·거래조건을 한 화면에서 관리</div>
       </button>
       <button class="action-card" onclick="setView('sales')">
         <div class="action-icon">📈</div>
