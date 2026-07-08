@@ -1,3 +1,85 @@
+function ensureStoreCompat() {
+  if (typeof getRecordType !== "function") {
+    window.getRecordType = function (record) {
+      if (record?.recordType) return record.recordType;
+      return record?.source === "po-upload" ? "order" : "quote";
+    };
+  }
+  if (typeof getQuotes !== "function") {
+    window.getQuotes = function (data, channelId) {
+      const list = channelId
+        ? data.proposals.filter((p) => p.channelId === channelId)
+        : data.proposals;
+      return list.filter((p) => getRecordType(p) === "quote");
+    };
+  }
+  if (typeof getOrders !== "function") {
+    window.getOrders = function (data, channelId) {
+      const list = channelId
+        ? data.proposals.filter((p) => p.channelId === channelId)
+        : data.proposals;
+      return list.filter((p) => getRecordType(p) === "order");
+    };
+  }
+  if (typeof getClientProposalCount !== "function") {
+    window.getClientProposalCount = function (data, client) {
+      return getQuotes(data).filter(
+        (p) => p.channelId === client.channelId && p.clientName === client.name
+      ).length;
+    };
+  }
+  if (typeof getClientOrderCount !== "function") {
+    window.getClientOrderCount = function (data, client) {
+      return getOrders(data).filter(
+        (p) => p.channelId === client.channelId && p.clientName === client.name
+      ).length;
+    };
+  }
+  if (typeof updateChannel !== "function") {
+    window.updateChannel = function (data, channelId, updates) {
+      const channels = getChannels(data);
+      const idx = channels.findIndex((c) => c.id === channelId);
+      if (idx === -1) return { ok: false, error: "채널을 찾을 수 없습니다." };
+      const name = updates.name?.trim();
+      if (!name) return { ok: false, error: "채널명을 입력해주세요." };
+      const currency = updates.currency === "KRW" ? "KRW" : "USD";
+      const fobPercent = parseFloat(updates.defaultFobRate);
+      channels[idx] = {
+        ...channels[idx],
+        name,
+        currency,
+        currencySymbol: currency === "KRW" ? "₩" : "$",
+        defaultFobRate: isNaN(fobPercent) ? channels[idx].defaultFobRate : fobPercent / 100,
+      };
+      data.channels = channels;
+      saveData(data);
+      return { ok: true };
+    };
+  }
+  if (typeof updateClient !== "function") {
+    window.updateClient = function (data, clientId, updates) {
+      const client = (data.clients || []).find((c) => c.id === clientId);
+      if (!client) return { ok: false, error: "업체를 찾을 수 없습니다." };
+      const name = updates.name?.trim();
+      if (!name) return { ok: false, error: "업체명을 입력해주세요." };
+      client.name = name;
+      client.contact = updates.contact?.trim() || "";
+      client.memo = updates.memo?.trim() || "";
+      saveData(data);
+      return { ok: true };
+    };
+  }
+}
+
+function escapeAttr(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
+}
+
+ensureStoreCompat();
+
 let appData = loadData();
 let currentView = "dashboard";
 let historyFilter = "";
@@ -318,38 +400,47 @@ function setView(view) {
 
 function render() {
   const content = document.getElementById("content");
-  switch (currentView) {
-    case "dashboard":
-      content.innerHTML = renderDashboard();
-      break;
-    case "proposal":
-      content.innerHTML = renderProposal();
-      bindProposalEvents();
-      break;
-    case "poupload":
-      content.innerHTML = renderPoUpload();
-      bindPoUploadEvents();
-      break;
-    case "products":
-      content.innerHTML = renderProducts();
-      bindProductEvents();
-      break;
-    case "master":
-      content.innerHTML = renderMaster();
-      bindMasterEvents();
-      break;
-    case "srp":
-      content.innerHTML = renderSrpMatrix();
-      bindSrpEvents();
-      break;
-    case "history":
-      content.innerHTML = renderHistory();
-      bindHistoryEvents();
-      break;
-    case "sales":
-      content.innerHTML = renderSales();
-      bindSalesEvents();
-      break;
+  if (!content) return;
+  try {
+    switch (currentView) {
+      case "dashboard":
+        content.innerHTML = renderDashboard();
+        break;
+      case "proposal":
+        content.innerHTML = renderProposal();
+        bindProposalEvents();
+        break;
+      case "poupload":
+        content.innerHTML = renderPoUpload();
+        bindPoUploadEvents();
+        break;
+      case "products":
+        content.innerHTML = renderProducts();
+        bindProductEvents();
+        break;
+      case "master":
+        content.innerHTML = renderMaster();
+        bindMasterEvents();
+        break;
+      case "srp":
+        content.innerHTML = renderSrpMatrix();
+        bindSrpEvents();
+        break;
+      case "history":
+        content.innerHTML = renderHistory();
+        bindHistoryEvents();
+        break;
+      case "sales":
+        content.innerHTML = renderSales();
+        bindSalesEvents();
+        break;
+      default:
+        content.innerHTML = `<div class="card"><div class="empty-state">알 수 없는 화면입니다.</div></div>`;
+    }
+  } catch (err) {
+    console.error("render error:", currentView, err);
+    content.innerHTML = `<div class="card"><div class="empty-state"><div class="empty-icon">⚠️</div>화면을 불러오지 못했습니다.<br><small>${escapeAttr(err.message)}</small><br><button class="btn btn-primary" style="margin-top:16px" onclick="location.reload()">새로고침</button></div></div>`;
+    showToast("화면 오류 — 새로고침 해주세요");
   }
 }
 
@@ -1815,7 +1906,7 @@ function renderMasterChannelDetail(channelId) {
           </div>
           <div class="form-group">
             <label>채널명 *</label>
-            <input type="text" name="name" value="${channel.name}" required>
+            <input type="text" name="name" value="${escapeAttr(channel.name)}" required>
           </div>
           <div class="form-group">
             <label>통화 *</label>
@@ -1833,7 +1924,7 @@ function renderMasterChannelDetail(channelId) {
           <button type="submit" class="btn btn-primary">채널 정보 저장</button>
           ${
             canDeleteChannel
-              ? `<button type="button" class="btn btn-danger" data-delete-channel="${channel.id}" data-channel-name="${channel.name}" data-client-count="0" data-proposal-count="0">채널 삭제</button>`
+              ? `<button type="button" class="btn btn-danger" data-delete-channel="${channel.id}" data-channel-name="${escapeAttr(channel.name)}" data-client-count="0" data-proposal-count="0">채널 삭제</button>`
               : `<span class="field-hint">업체 ${usage.clients}개 · 단가표 ${usage.proposals}건 연결 — 삭제 불가</span>`
           }
         </div>
@@ -1847,15 +1938,15 @@ function renderMasterChannelDetail(channelId) {
         <div class="form-grid form-grid-2">
           <div class="form-group">
             <label>업체명 *</label>
-            <input type="text" name="name" placeholder="예: 올리브영 본사, OO무역" value="${editingClient?.name || ""}" required>
+            <input type="text" name="name" placeholder="예: 올리브영 본사, OO무역" value="${escapeAttr(editingClient?.name || "")}" required>
           </div>
           <div class="form-group">
             <label>담당자 / 연락처</label>
-            <input type="text" name="contact" placeholder="홍길동 / 010-0000-0000" value="${editingClient?.contact || ""}">
+            <input type="text" name="contact" placeholder="홍길동 / 010-0000-0000" value="${escapeAttr(editingClient?.contact || "")}">
           </div>
           <div class="form-group form-grid-full">
             <label>메모</label>
-            <input type="text" name="memo" placeholder="비고 사항" value="${editingClient?.memo || ""}">
+            <input type="text" name="memo" placeholder="비고 사항" value="${escapeAttr(editingClient?.memo || "")}">
           </div>
         </div>
         <div class="master-form-actions">
@@ -1893,7 +1984,7 @@ function renderMasterChannelDetail(channelId) {
                 <td>${orderCount > 0 ? `<span class="count-badge">${orderCount}건</span>` : "—"}</td>
                 <td class="master-row-actions">
                   <button type="button" class="btn btn-secondary btn-sm" data-edit-client="${c.id}">수정</button>
-                  <button type="button" class="btn btn-danger btn-sm" data-delete-client="${c.id}" data-client-name="${c.name}" data-proposal-count="${quoteCount}">삭제</button>
+                  <button type="button" class="btn btn-danger btn-sm" data-delete-client="${c.id}" data-client-name="${escapeAttr(c.name)}" data-proposal-count="${quoteCount}">삭제</button>
                 </td>
               </tr>`;
               })
@@ -1926,7 +2017,8 @@ function renderMasterChannelDetail(channelId) {
 }
 
 function bindMasterEvents() {
-  document.querySelectorAll("[data-select-channel]").forEach((btn) => {
+  try {
+    document.querySelectorAll("[data-select-channel]").forEach((btn) => {
     btn.addEventListener("click", () => {
       masterChannelId = btn.dataset.selectChannel;
       masterNewChannel = false;
@@ -2051,6 +2143,10 @@ function bindMasterEvents() {
   });
 
   bindMasterDeleteHandlers();
+  } catch (err) {
+    console.error("bindMasterEvents error:", err);
+    showToast("일부 버튼 연결 오류 — 새로고침 해주세요");
+  }
 }
 
 function bindMasterDeleteHandlers() {
@@ -2561,6 +2657,18 @@ function bindSalesEvents() {
   });
 }
 
+function setupSidebarNav() {
+  const nav = document.querySelector(".sidebar-nav");
+  if (!nav || nav.dataset.bound) return;
+  nav.dataset.bound = "1";
+  nav.addEventListener("click", (e) => {
+    const btn = e.target.closest(".nav-item[data-view]");
+    if (!btn?.dataset.view) return;
+    e.preventDefault();
+    setView(btn.dataset.view);
+  });
+}
+
 function openProposal(channelId) {
   initProposalState(channelId);
   setView("proposal");
@@ -2570,10 +2678,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initProposalState("CN");
   setupGlobalDeleteHandlers();
   setupClientModal();
-
-  document.querySelectorAll(".nav-item").forEach((btn) => {
-    btn.addEventListener("click", () => setView(btn.dataset.view));
-  });
+  setupSidebarNav();
 
   document.getElementById("menu-toggle")?.addEventListener("click", () => {
     document.getElementById("sidebar").classList.toggle("open");
@@ -2590,3 +2695,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("page-desc").textContent = meta.desc;
   render();
 });
+
+window.setView = setView;
+window.openMaster = openMaster;
+window.openProposal = openProposal;
