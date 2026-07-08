@@ -9,7 +9,7 @@
     <title>바를 영업 관리</title>
     <script>
       (function () {
-        var APP_BUILD = "2026-07-09-v12";
+        var APP_BUILD = "2026-07-09-v13";
         var key = "barle-app-build";
         var saved = localStorage.getItem(key);
         if (saved !== APP_BUILD && location.search.indexOf("nocache=") === -1) {
@@ -18,7 +18,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="css/styles.css?v=12" />
+    <link rel="stylesheet" href="css/styles.css?v=13" />
   </head>
   <body>
     <aside class="sidebar" id="sidebar">
@@ -83,14 +83,14 @@
             <span class="nav-icon">🌐</span>
             <span class="nav-text">
               <strong>거래처 통합 등록</strong>
-              <small>채널·업체·거래조건 한번에</small>
+              <small>국가·업체·거래조건 한번에</small>
             </span>
           </button>
           <button class="nav-item" data-view="srp">
             <span class="nav-icon">💰</span>
             <span class="nav-text">
               <strong>소비자가 설정</strong>
-              <small>채널별 권장 소비자가</small>
+              <small>국가별 권장 소비자가</small>
             </span>
           </button>
         </div>
@@ -150,7 +150,7 @@
         </div>
         <form id="quick-client-form" class="client-modal-body">
           <div class="form-group">
-            <label>판매 채널 *</label>
+            <label>판매 국가 *</label>
             <select name="channelId" id="quick-client-channel" required></select>
           </div>
           <div class="form-group">
@@ -175,10 +175,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-    <script src="js/data.js?v=12"></script>
-    <script src="js/store.js?v=12"></script>
-    <script src="js/excel.js?v=12"></script>
-    <script src="js/poimport.js?v=12"></script>
-    <script src="js/app.js?v=12"></script>
+    <script src="js/data.js?v=13"></script>
+    <script src="js/store.js?v=13"></script>
+    <script src="js/excel.js?v=13"></script>
+    <script src="js/poimport.js?v=13"></script>
+    <script src="js/app.js?v=13"></script>
   </body>
 </html>

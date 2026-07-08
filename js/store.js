@@ -135,16 +135,16 @@ function getDefaultChannelTerms(data, channelId) {
 
 function addChannel(data, channel) {
   const id = channel.id?.trim().toUpperCase();
-  if (!id) return { ok: false, error: "채널 코드를 입력해주세요." };
+  if (!id) return { ok: false, error: "국가 코드를 입력해주세요." };
   if (!/^[A-Z0-9-]+$/.test(id)) {
-    return { ok: false, error: "채널 코드는 영문, 숫자, 하이픈(-)만 사용할 수 있습니다." };
+    return { ok: false, error: "국가 코드는 영문, 숫자, 하이픈(-)만 사용할 수 있습니다." };
   }
   const name = channel.name?.trim();
-  if (!name) return { ok: false, error: "채널명을 입력해주세요." };
+  if (!name) return { ok: false, error: "판매국가명을 입력해주세요." };
 
   const channels = getChannels(data);
   if (channels.some((c) => c.id === id)) {
-    return { ok: false, error: "이미 존재하는 채널 코드입니다." };
+    return { ok: false, error: "이미 존재하는 국가 코드입니다." };
   }
 
   const currency = channel.currency === "KRW" ? "KRW" : "USD";
@@ -172,10 +172,10 @@ function addChannel(data, channel) {
 function updateChannel(data, channelId, updates) {
   const channels = getChannels(data);
   const idx = channels.findIndex((c) => c.id === channelId);
-  if (idx === -1) return { ok: false, error: "채널을 찾을 수 없습니다." };
+  if (idx === -1) return { ok: false, error: "판매국가를 찾을 수 없습니다." };
 
   const name = updates.name?.trim();
-  if (!name) return { ok: false, error: "채널명을 입력해주세요." };
+  if (!name) return { ok: false, error: "판매국가명을 입력해주세요." };
 
   const currency = updates.currency === "KRW" ? "KRW" : "USD";
   const fobPercent = parseFloat(updates.defaultFobRate);
@@ -198,7 +198,7 @@ function updateChannel(data, channelId, updates) {
 function deleteChannel(data, channelId) {
   const channels = getChannels(data);
   if (channels.length <= 1) {
-    return { ok: false, error: "최소 1개 채널은 유지해야 합니다." };
+    return { ok: false, error: "최소 1개 판매국가는 유지해야 합니다." };
   }
 
   const clientCount = (data.clients || []).filter((c) => c.channelId === channelId).length;
@@ -206,7 +206,7 @@ function deleteChannel(data, channelId) {
   if (clientCount > 0 || proposalCount > 0) {
     return {
       ok: false,
-      error: `이 채널에 등록된 업체 ${clientCount}개, 단가표 ${proposalCount}건이 있어 삭제할 수 없습니다.`,
+      error: `이 판매국가에 등록된 업체 ${clientCount}개, 단가표 ${proposalCount}건이 있어 삭제할 수 없습니다.`,
     };
   }
 
@@ -353,12 +353,12 @@ function getClients(data, channelId) {
 function addClient(data, client) {
   const name = client.name?.trim();
   if (!name) return { ok: false, error: "업체명을 입력해주세요." };
-  if (!client.channelId) return { ok: false, error: "채널을 선택해주세요." };
+  if (!client.channelId) return { ok: false, error: "판매국가를 선택해주세요." };
 
   const exists = (data.clients || []).some(
     (c) => c.channelId === client.channelId && c.name === name
   );
-  if (exists) return { ok: false, error: "같은 채널에 이미 등록된 업체입니다." };
+  if (exists) return { ok: false, error: "같은 판매국가에 이미 등록된 업체입니다." };
 
   if (!data.clients) data.clients = [];
   data.clients.push({
@@ -381,12 +381,12 @@ function updateClient(data, clientId, updates) {
   if (!name) return { ok: false, error: "업체명을 입력해주세요." };
 
   const channelId = updates.channelId || client.channelId;
-  if (!channelId) return { ok: false, error: "채널을 선택해주세요." };
+  if (!channelId) return { ok: false, error: "판매국가를 선택해주세요." };
 
   const duplicate = (data.clients || []).some(
     (c) => c.id !== clientId && c.channelId === channelId && c.name === name
   );
-  if (duplicate) return { ok: false, error: "같은 채널에 이미 등록된 업체입니다." };
+  if (duplicate) return { ok: false, error: "같은 판매국가에 이미 등록된 업체입니다." };
 
   const oldName = client.name;
   const oldChannelId = client.channelId;

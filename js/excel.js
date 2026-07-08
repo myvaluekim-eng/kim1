@@ -7,7 +7,7 @@ function exportProposalToExcel(proposal) {
   const ch = getChannels(appData).find((c) => c.id === proposal.channelId);
   const rows = [
     ["PRODUCT & PRICE LIST"],
-    ["채널", ch.name],
+    ["판매국가", ch.name],
     ["업체명", proposal.clientName],
     ["작성일", proposal.poDate],
     ["FOB 비율 (%)", proposal.fobRate],
@@ -78,7 +78,7 @@ function exportSalesSummaryToExcel(summary, yearMonth) {
   const rows = [
     [`바를 영업 현황 — ${y}년 ${parseInt(m)}월`],
     [],
-    ["채널", "업체명", "발주 건수", "합계 금액", "통화", "최근 발주일"],
+    ["판매국가", "업체명", "발주 건수", "합계 금액", "통화", "최근 발주일"],
   ];
 
   summary.clients.forEach((c) => {
@@ -86,7 +86,7 @@ function exportSalesSummaryToExcel(summary, yearMonth) {
   });
 
   rows.push([]);
-  rows.push(["채널별 소계"]);
+  rows.push(["국가별 소계"]);
   summary.byChannel.forEach((ch) => {
     rows.push([ch.channelName, "", ch.count, ch.totalAmount, ch.currency, ""]);
   });

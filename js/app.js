@@ -39,9 +39,9 @@ function ensureStoreCompat() {
     window.updateChannel = function (data, channelId, updates) {
       const channels = getChannels(data);
       const idx = channels.findIndex((c) => c.id === channelId);
-      if (idx === -1) return { ok: false, error: "채널을 찾을 수 없습니다." };
+      if (idx === -1) return { ok: false, error: "판매국가를 찾을 수 없습니다." };
       const name = updates.name?.trim();
-      if (!name) return { ok: false, error: "채널명을 입력해주세요." };
+      if (!name) return { ok: false, error: "판매국가명을 입력해주세요." };
       const currency = updates.currency === "KRW" ? "KRW" : "USD";
       const fobPercent = parseFloat(updates.defaultFobRate);
       channels[idx] = {
@@ -345,7 +345,7 @@ function setupGlobalDeleteHandlers() {
       if (
         !(await confirmDelete(
           getRecordType(proposal) === "order" ? "발주서 삭제" : "단가표 삭제",
-          `업체: ${proposal.clientName}\n채널: ${ch?.name}\n버전: v${proposal.version}\n작성일: ${proposal.poDate}`
+          `업체: ${proposal.clientName}\n판매국가: ${ch?.name}\n버전: v${proposal.version}\n작성일: ${proposal.poDate}`
         ))
       ) {
         return;
@@ -368,11 +368,11 @@ const PAGE_META = {
   products: { title: "제품 등록", desc: "새로 출시된 제품을 등록하거나 기존 제품을 관리합니다." },
   master: {
     title: "거래처 통합 등록",
-    desc: "판매채널, 거래 업체, 거래 조건을 한 화면에서 등록·수정합니다.",
+    desc: "판매국가, 거래 업체, 거래 조건을 한 화면에서 등록·수정합니다.",
   },
-  srp: { title: "소비자가 설정", desc: "채널별 권장 소비자가를 미리 입력해 두면 단가표에 자동으로 채워집니다." },
+  srp: { title: "소비자가 설정", desc: "국가별 권장 소비자가를 미리 입력해 두면 단가표에 자동으로 채워집니다." },
   history: { title: "지난 단가표", desc: "바이어에게 보낸 단가표(견적) 이력만 모아 봅니다. 발주서는 영업 현황에서 확인합니다." },
-  sales: { title: "영업 현황", desc: "이번 달 업체별·채널별 발주 건수와 금액을 한눈에 확인합니다." },
+  sales: { title: "영업 현황", desc: "이번 달 업체별·국가별 발주 건수와 금액을 한눈에 확인합니다." },
 };
 
 function setView(view) {
@@ -553,12 +553,12 @@ function renderDashboard() {
       <button class="action-card" onclick="openMaster('')">
         <div class="action-icon">🌐</div>
         <div class="action-title">거래처 통합 등록</div>
-        <div class="action-desc">채널·업체·거래조건을 한 화면에서 관리</div>
+        <div class="action-desc">국가·업체·거래조건을 한 화면에서 관리</div>
       </button>
       <button class="action-card" onclick="setView('sales')">
         <div class="action-icon">📈</div>
         <div class="action-title">영업 현황</div>
-        <div class="action-desc">이번 달 업체별·채널별 발주 확인</div>
+        <div class="action-desc">이번 달 업체별·국가별 발주 확인</div>
       </button>
     </div>
 
@@ -568,11 +568,11 @@ function renderDashboard() {
       <div class="steps-guide">
         <div class="step-item">
           <span class="step-num">1</span>
-          <p><strong>채널·업체·거래조건 등록</strong>판매 채널, 거래처, 거래 조건을 한 화면에서 등록합니다</p>
+          <p><strong>국가·업체·거래조건 등록</strong>판매 국가, 거래처, 거래 조건을 한 화면에서 등록합니다</p>
         </div>
         <div class="step-item">
           <span class="step-num">2</span>
-          <p><strong>소비자가 입력</strong>채널별 권장 소비자가를 설정합니다 (선택)</p>
+          <p><strong>소비자가 입력</strong>국가별 권장 소비자가를 설정합니다 (선택)</p>
         </div>
         <div class="step-item">
           <span class="step-num">3</span>
@@ -587,7 +587,7 @@ function renderDashboard() {
         <div class="value">${products.length}<span style="font-size:16px">개</span></div>
       </div>
       <div class="stat-card">
-        <div class="label">관리 채널</div>
+        <div class="label">관리 국가</div>
         <div class="value">${channels.length}<span style="font-size:16px">개</span></div>
         <div class="sub">${channels.map((c) => c.name).join(" · ")}</div>
       </div>
@@ -605,13 +605,13 @@ function renderDashboard() {
     </div>
 
     <div class="card">
-      <div class="card-title">채널별 바로가기</div>
-      <div class="card-desc">채널을 선택하면 단가표 작성 화면으로 이동합니다.</div>
+      <div class="card-title">국가별 바로가기</div>
+      <div class="card-desc">판매국가를 선택하면 단가표 작성 화면으로 이동합니다.</div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>채널</th>
+              <th>판매국가</th>
               <th>통화</th>
               <th>기본 FOB 비율</th>
               <th>저장된 단가표</th>
@@ -720,7 +720,7 @@ function renderProposal() {
     <div class="card">
       <div class="proposal-header">
         <h3>제품 가격표 (Price List)</h3>
-        <p>Barle Cosmetics · ${channel.name} 채널</p>
+        <p>Barle Cosmetics · ${channel.name}</p>
       </div>
     </div>
 
@@ -737,7 +737,7 @@ function renderProposal() {
       <div class="proposal-meta-panel">
         <div class="proposal-meta-fields">
           <div class="form-group">
-            <label>판매 채널</label>
+            <label>판매 국가</label>
             <select id="channel-select">
               ${renderChannelOptions(proposalState.channelId)}
             </select>
@@ -827,7 +827,7 @@ function renderProposal() {
       <h4>거래 조건 (Terms & Conditions) — ${channel.name}</h4>
       ${terms.map((t) => `<p>${t}</p>`).join("")}
       <p class="no-print" style="margin-top:12px;font-size:13px;color:var(--text-muted)">
-        거래 조건을 바꾸려면 왼쪽 메뉴 <strong>데이터 관리 → 채널·업체·거래조건</strong>에서 수정하세요.
+        거래 조건을 바꾸려면 왼쪽 메뉴 <strong>데이터 관리 → 국가·업체·거래조건</strong>에서 수정하세요.
       </p>
     </div>
   `;
@@ -1252,10 +1252,10 @@ function renderPoUpload() {
     </div>
 
     <div class="section-block no-print">
-      <div class="section-label">① 채널·업체 입력</div>
+      <div class="section-label">① 국가·업체 입력</div>
       <div class="form-row">
         <div class="form-group">
-          <label>판매 채널</label>
+          <label>판매 국가</label>
           <select id="po-channel-select">${renderChannelOptions(poUploadState.channelId)}</select>
         </div>
         <div class="form-group form-group-client">
@@ -1348,7 +1348,7 @@ function handlePoFile(file) {
     if (parsed.isOliveYoung && poUploadState.rows.length) {
       poUploadState.warning = [
         poUploadState.warning,
-        "올리브영 구매발주서로 인식했습니다. 채널이 올리브영으로 설정됩니다.",
+        "올리브영 구매발주서로 인식했습니다. 판매국가가 올리브영으로 설정됩니다.",
       ]
         .filter(Boolean)
         .join(" ");
@@ -1813,12 +1813,12 @@ function renderMaster() {
   return `
     <div class="help-box no-print">
       <span class="help-icon">🌐</span>
-      <div>왼쪽에서 <strong>판매 채널</strong>을 선택하면 채널 정보·거래 업체·거래 조건을 한 번에 관리할 수 있습니다.
+      <div>왼쪽에서 <strong>판매 국가</strong>를 선택하면 국가 정보·거래 업체·거래 조건을 한 번에 관리할 수 있습니다.
         단가표·발주서 화면에서도 등록된 업체를 바로 선택할 수 있습니다.</div>
     </div>
     <div class="master-layout no-print">
       <aside class="card master-sidebar">
-        <div class="card-title">판매 채널</div>
+        <div class="card-title">판매 국가</div>
         <ul class="master-channel-list">
           ${channels
             .map((ch) => {
@@ -1834,7 +1834,7 @@ function renderMaster() {
             })
             .join("")}
         </ul>
-        <button type="button" class="btn btn-secondary btn-sm master-new-btn" id="btn-master-new-channel">+ 신규 채널</button>
+        <button type="button" class="btn btn-secondary btn-sm master-new-btn" id="btn-master-new-channel">+ 신규 국가</button>
       </aside>
       <div class="master-detail">
         ${masterNewChannel ? renderMasterNewChannel() : renderMasterChannelDetail(masterChannelId)}
@@ -1846,18 +1846,18 @@ function renderMaster() {
 function renderMasterNewChannel() {
   return `
     <div class="card">
-      <div class="card-title">신규 판매 채널 등록</div>
-      <p class="card-desc">채널을 만든 뒤 같은 화면에서 업체와 거래 조건을 바로 추가할 수 있습니다.</p>
+      <div class="card-title">신규 판매 국가 등록</div>
+      <p class="card-desc">판매국가를 만든 뒤 같은 화면에서 업체와 거래 조건을 바로 추가할 수 있습니다.</p>
       <form id="master-new-channel-form">
         <div class="form-grid form-grid-2">
           <div class="form-group">
-            <label>채널 코드 *</label>
-            <input type="text" name="id" placeholder="예: JP, KR-OLIVE" required pattern="[A-Za-z0-9-]+" title="영문, 숫자, 하이픈">
+            <label>국가 코드 *</label>
+            <input type="text" name="id" placeholder="예: US-ULTA, OFFLINE" required pattern="[A-Za-z0-9-]+" title="영문, 숫자, 하이픈">
             <span class="field-hint">영문·숫자·하이픈 (저장 시 대문자)</span>
           </div>
           <div class="form-group">
-            <label>채널명 *</label>
-            <input type="text" name="name" placeholder="예: 일본, 올리브영" required>
+            <label>판매국가명 *</label>
+            <input type="text" name="name" placeholder="예: Ulta Beauty, 오프라인" required>
           </div>
           <div class="form-group">
             <label>통화 *</label>
@@ -1872,7 +1872,7 @@ function renderMasterNewChannel() {
           </div>
         </div>
         <div class="master-form-actions">
-          <button type="submit" class="btn btn-primary btn-lg">채널 등록</button>
+          <button type="submit" class="btn btn-primary btn-lg">국가 등록</button>
           <button type="button" class="btn btn-secondary btn-lg" id="btn-master-cancel-new">취소</button>
         </div>
       </form>
@@ -1883,7 +1883,7 @@ function renderMasterNewChannel() {
 function renderMasterChannelDetail(channelId) {
   const channel = getChannelList().find((c) => c.id === channelId);
   if (!channel) {
-    return `<div class="card"><div class="empty-state"><div class="empty-icon">🌐</div>채널을 선택하거나 신규 채널을 추가해주세요.</div></div>`;
+    return `<div class="card"><div class="empty-state"><div class="empty-icon">🌐</div>판매국가를 선택하거나 신규 국가를 추가해주세요.</div></div>`;
   }
 
   const usage = getChannelUsage(appData, channelId);
@@ -1896,16 +1896,16 @@ function renderMasterChannelDetail(channelId) {
 
   return `
     <div class="card">
-      <div class="card-title">① 채널 기본 정보</div>
+      <div class="card-title">① 국가 기본 정보</div>
       <form id="master-channel-form">
         <div class="form-grid form-grid-2">
           <div class="form-group">
-            <label>채널 코드</label>
+            <label>국가 코드</label>
             <input type="text" value="${channel.id}" disabled class="input-readonly">
             <span class="field-hint">코드는 등록 후 변경할 수 없습니다</span>
           </div>
           <div class="form-group">
-            <label>채널명 *</label>
+            <label>판매국가명 *</label>
             <input type="text" name="name" value="${escapeAttr(channel.name)}" required>
           </div>
           <div class="form-group">
@@ -1921,10 +1921,10 @@ function renderMasterChannelDetail(channelId) {
           </div>
         </div>
         <div class="master-form-actions">
-          <button type="submit" class="btn btn-primary">채널 정보 저장</button>
+          <button type="submit" class="btn btn-primary">국가 정보 저장</button>
           ${
             canDeleteChannel
-              ? `<button type="button" class="btn btn-danger" data-delete-channel="${channel.id}" data-channel-name="${escapeAttr(channel.name)}" data-client-count="0" data-proposal-count="0">채널 삭제</button>`
+              ? `<button type="button" class="btn btn-danger" data-delete-channel="${channel.id}" data-channel-name="${escapeAttr(channel.name)}" data-client-count="0" data-proposal-count="0">국가 삭제</button>`
               : `<span class="field-hint">업체 ${usage.clients}개 · 단가표 ${usage.proposals}건 연결 — 삭제 불가</span>`
           }
         </div>
@@ -2056,7 +2056,7 @@ function bindMasterEvents() {
     masterChannelId = newId;
     masterNewChannel = false;
     termsChannelId = newId;
-    showToast("채널이 등록되었습니다. 업체와 거래 조건을 추가해주세요.");
+    showToast("판매국가가 등록되었습니다. 업체와 거래 조건을 추가해주세요.");
     render();
   });
 
@@ -2075,7 +2075,7 @@ function bindMasterEvents() {
     if (proposalState.channelId === masterChannelId) {
       proposalState.fobRate = Math.round(findChannel(masterChannelId).defaultFobRate * 100);
     }
-    showToast("채널 정보가 저장되었습니다");
+    showToast("국가 정보가 저장되었습니다");
     render();
   });
 
@@ -2128,7 +2128,7 @@ function bindMasterEvents() {
 
   document.getElementById("btn-master-reset-terms")?.addEventListener("click", async () => {
     const channel = findChannel(masterChannelId);
-    if (!(await confirmRestore("거래 조건 복원", `채널: ${channel.name}`))) return;
+    if (!(await confirmRestore("거래 조건 복원", `판매국가: ${channel.name}`))) return;
     setChannelTerms(appData, masterChannelId, getDefaultChannelTerms(appData, masterChannelId));
     showToast("기본값으로 복원되었습니다");
     render();
@@ -2136,7 +2136,7 @@ function bindMasterEvents() {
 
   document.getElementById("btn-master-clear-terms")?.addEventListener("click", async () => {
     const channel = findChannel(masterChannelId);
-    if (!(await confirmDelete("거래 조건 삭제", `채널: ${channel.name}\n※ 모든 거래 조건 항목이 삭제됩니다`))) return;
+    if (!(await confirmDelete("거래 조건 삭제", `판매국가: ${channel.name}\n※ 모든 거래 조건 항목이 삭제됩니다`))) return;
     clearChannelTerms(appData, masterChannelId);
     showToast("거래 조건이 삭제되었습니다");
     render();
@@ -2154,7 +2154,7 @@ function bindMasterDeleteHandlers() {
     btn.addEventListener("click", async () => {
       const channelId = btn.dataset.deleteChannel;
       const name = btn.dataset.channelName;
-      if (!(await confirmDelete("채널 삭제", `채널: ${name}\n코드: ${channelId}`))) return;
+      if (!(await confirmDelete("국가 삭제", `판매국가: ${name}\n코드: ${channelId}`))) return;
       const result = deleteChannel(appData, channelId);
       if (!result.ok) {
         showToast(result.error);
@@ -2165,7 +2165,7 @@ function bindMasterDeleteHandlers() {
       }
       masterChannelId = getChannelList()[0]?.id || "";
       termsChannelId = masterChannelId;
-      showToast(`채널 "${name}" 삭제됨`);
+      showToast(`판매국가 "${name}" 삭제됨`);
       render();
     });
   });
@@ -2196,10 +2196,10 @@ function renderSrpMatrix() {
   return `
     <div class="help-box no-print">
       <span class="help-icon">💰</span>
-      <div>채널별 <strong>권장 소비자가</strong>를 미리 입력해 두면, 단가표 작성 시 자동으로 채워집니다. ₩ 또는 $ 중 하나만 입력해도 됩니다.</div>
+      <div>국가별 <strong>권장 소비자가</strong>를 미리 입력해 두면, 단가표 작성 시 자동으로 채워집니다. ₩ 또는 $ 중 하나만 입력해도 됩니다.</div>
     </div>
     <div class="card">
-      <div class="card-title">채널별 소비자가</div>
+      <div class="card-title">국가별 소비자가</div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -2275,7 +2275,7 @@ function bindSrpEvents() {
       if (
         !(await confirmDelete(
           "소비자가 삭제",
-          `제품: ${name}\n제품코드: ${code}\n※ 모든 채널의 소비자가가 삭제됩니다`
+          `제품: ${name}\n제품코드: ${code}\n※ 모든 국가의 소비자가가 삭제됩니다`
         ))
       )
         return;
@@ -2302,7 +2302,7 @@ function renderHistory() {
     return `
       <div class="form-row no-print">
         <div class="form-group">
-          <label>채널 필터</label>
+          <label>국가 필터</label>
           <select id="history-filter">
             <option value="">전체</option>
             ${getChannelList().map((ch) => `<option value="${ch.id}">${ch.name}</option>`).join("")}
@@ -2322,7 +2322,7 @@ function renderHistory() {
   return `
     <div class="form-row no-print">
       <div class="form-group">
-        <label>채널 필터</label>
+        <label>국가 필터</label>
         <select id="history-filter">
           <option value="">전체</option>
           ${getChannelList().map(
@@ -2540,12 +2540,12 @@ function renderSales() {
 
     <div class="card">
       <div class="card-title">업체별 발주 리스트 — ${monthLabel}</div>
-      <div class="card-desc">채널·업체별로 이번 달 몇 번 발주가 들어왔는지 확인하세요.</div>
+      <div class="card-desc">국가·업체별로 이번 달 몇 번 발주가 들어왔는지 확인하세요.</div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>채널</th>
+              <th>판매국가</th>
               <th>업체명</th>
               <th style="text-align:center">발주 건수</th>
               <th style="text-align:right">합계 금액</th>
