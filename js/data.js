@@ -162,6 +162,7 @@ const DEFAULT_CHANNELS = [
 ];
 
 const DEFAULT_EXCHANGE_RATE = 1350;
+const DEFAULT_JPY_PER_USD = 150;
 
 const DEFAULT_SRP = {
   "Br-0011": { "KR-OLIVE": { krw: null, usd: null }, CN: { krw: null, usd: 29.59 }, US: { krw: null, usd: 32.0 } },

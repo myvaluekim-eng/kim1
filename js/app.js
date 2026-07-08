@@ -192,6 +192,11 @@ function formatKrw(value) {
   return "₩" + Math.round(value).toLocaleString("ko-KR");
 }
 
+function formatJpy(value) {
+  if (value == null) return "—";
+  return "¥" + Math.round(value).toLocaleString("ja-JP");
+}
+
 function formatUsd(value) {
   if (value == null) return "—";
   return "$" + value.toFixed(2);
@@ -206,6 +211,7 @@ function formatMoney(value, channel) {
 function formatByCurrency(value, currency) {
   if (value == null) return "—";
   if (currency === "KRW") return formatKrw(value);
+  if (currency === "JPY") return formatJpy(value);
   return formatUsd(value);
 }
 
@@ -213,20 +219,22 @@ function formatProposalMoney(value, proposal, channel) {
   return formatByCurrency(value, getProposalCurrency(proposal, channel));
 }
 
-function formatDualCurrencyTotals(krw, usd, separator = " · ") {
+function formatDualCurrencyTotals(krw, usd, separator = " · ", jpy = 0) {
   const parts = [];
   if (usd > 0) parts.push(formatUsd(usd));
   if (krw > 0) parts.push(formatKrw(krw));
+  if (jpy > 0) parts.push(formatJpy(jpy));
   return parts.length ? parts.join(separator) : "—";
 }
 
-function formatDualCurrencyTotalsHtml(krw, usd) {
-  return formatDualCurrencyTotals(krw, usd, "<br>");
+function formatDualCurrencyTotalsHtml(krw, usd, jpy = 0) {
+  return formatDualCurrencyTotals(krw, usd, "<br>", jpy);
 }
 
 function formatProposalUnitPrice(item, proposal, channel) {
   const currency = getProposalCurrency(proposal, channel);
   if (currency === "KRW") return formatKrw(item.srpKrw ?? 0);
+  if (currency === "JPY") return formatJpy(item.srpJpy ?? 0);
   return formatUsd(item.srpUsd ?? 0);
 }
 
@@ -242,7 +250,7 @@ function renderSalesChannelDetail(channelId, summary, monthLabel) {
     <div class="card sales-channel-detail">
       <div class="card-title">${ch.channelName} 발주 상세 — ${monthLabel} (${ch.count}건)</div>
       <div class="card-desc">
-        국가 합계 ${formatDualCurrencyTotals(ch.totalKrw, ch.totalUsd)} · 업체 ${channelClients.length}곳
+        국가 합계 ${formatDualCurrencyTotals(ch.totalKrw, ch.totalUsd, " · ", ch.totalJpy)} · 업체 ${channelClients.length}곳
       </div>
       ${channelClients
         .map((client) => {
@@ -256,7 +264,7 @@ function renderSalesChannelDetail(channelId, summary, monthLabel) {
               <strong>${client.clientName}</strong>
               <span class="sales-client-count">${client.count}건</span>
             </div>
-            <div class="sales-client-totals">${formatDualCurrencyTotalsHtml(client.totalKrw, client.totalUsd)}</div>
+            <div class="sales-client-totals">${formatDualCurrencyTotalsHtml(client.totalKrw, client.totalUsd, client.totalJpy)}</div>
           </div>
           ${proposals
             .map(
@@ -1138,8 +1146,27 @@ function getPoManualExchangeRate() {
   return appData.exchangeRate || DEFAULT_EXCHANGE_RATE;
 }
 
+function getPoManualJpyRate() {
+  return appData.jpyPerUsd || DEFAULT_JPY_PER_USD;
+}
+
 function formatPoManualMoney(amount) {
-  return poUploadState.manualPriceCurrency === "KRW" ? formatKrw(amount) : formatUsd(amount);
+  return formatByCurrency(amount, poUploadState.manualPriceCurrency);
+}
+
+function convertPoManualPrice(price, from, to) {
+  if (price == null || from === to) return price;
+  const krwRate = getPoManualExchangeRate();
+  const jpyRate = getPoManualJpyRate();
+
+  let usd;
+  if (from === "USD") usd = price;
+  else if (from === "KRW") usd = price / krwRate;
+  else usd = price / jpyRate;
+
+  if (to === "USD") return Math.round(usd * 100) / 100;
+  if (to === "KRW") return Math.round(usd * krwRate);
+  return Math.round(usd * jpyRate);
 }
 
 function resolvePoManualUnitPriceUsd(product, srp) {
@@ -1159,6 +1186,12 @@ function resolvePoManualUnitPrice(code, currency) {
     if (product?.srpKrw != null && product.srpKrw > 0) return product.srpKrw;
     const usd = resolvePoManualUnitPriceUsd(product, srp);
     return usd != null ? Math.round(usd * rate) : null;
+  }
+
+  if (currency === "JPY") {
+    const jpyRate = getPoManualJpyRate();
+    const usd = resolvePoManualUnitPriceUsd(product, srp);
+    return usd != null ? Math.round(usd * jpyRate) : null;
   }
 
   return resolvePoManualUnitPriceUsd(product, srp);
@@ -1197,20 +1230,15 @@ function removePoManualProduct(code) {
 
 function switchPoManualCurrency(currency) {
   if (poUploadState.manualPriceCurrency === currency) return;
-  const rate = getPoManualExchangeRate();
   const from = poUploadState.manualPriceCurrency;
   poUploadState.manualSelected.forEach((code) => {
     ensurePoManualItemDefaults(code);
     const item = poUploadState.manualItems[code];
     if (!item) return;
-    if (item.unitPrice == null) {
+    if (item.unitPrice != null) {
+      item.unitPrice = convertPoManualPrice(item.unitPrice, from, currency);
+    } else {
       item.unitPrice = resolvePoManualUnitPrice(code, currency);
-      return;
-    }
-    if (from === "USD" && currency === "KRW") {
-      item.unitPrice = Math.round(item.unitPrice * rate);
-    } else if (from === "KRW" && currency === "USD") {
-      item.unitPrice = Math.round((item.unitPrice / rate) * 100) / 100;
     }
     const qty = item.qty || 0;
     item.amount = qty > 0 && item.unitPrice != null ? qty * item.unitPrice : 0;
@@ -1239,7 +1267,9 @@ function updatePoManualCalcs() {
 function renderPoManualSection(channel) {
   const products = getProducts(appData);
   const currency = poUploadState.manualPriceCurrency;
-  const unitLabel = currency === "KRW" ? "단가 (₩)" : "단가 ($)";
+  const unitLabel =
+    currency === "KRW" ? "단가 (₩)" : currency === "JPY" ? "단가 (¥)" : "단가 ($)";
+  const unitStep = currency === "USD" ? "0.01" : "1";
 
   let totalAmount = 0;
   const selectedRows = poUploadState.manualSelected
@@ -1260,7 +1290,7 @@ function renderPoManualSection(channel) {
             data-po-manual-field="qty" data-code="${p.code}" value="${qty || ""}" placeholder="0">
         </td>
         <td class="editable">
-          <input class="input-cell" type="number" step="${currency === "USD" ? "0.01" : "1"}" min="0"
+          <input class="input-cell" type="number" step="${unitStep}" min="0"
             data-po-manual-field="unitPrice" data-code="${p.code}" value="${unitPrice ?? ""}" placeholder="0">
         </td>
         <td class="auto" data-po-manual-amount="${p.code}">${formatPoManualMoney(amount)}</td>
@@ -1294,6 +1324,7 @@ function renderPoManualSection(channel) {
           <span class="po-currency-label">단가 통화</span>
           <button type="button" class="po-currency-btn${currency === "KRW" ? " active" : ""}" data-po-currency="KRW">₩ 원화</button>
           <button type="button" class="po-currency-btn${currency === "USD" ? " active" : ""}" data-po-currency="USD">$ 달러</button>
+          <button type="button" class="po-currency-btn${currency === "JPY" ? " active" : ""}" data-po-currency="JPY">¥ 엔화</button>
         </div>
       </div>
 
@@ -1516,6 +1547,7 @@ function savePoUpload() {
           nameKor: p.nameKor,
           srpKrw: currency === "KRW" ? unitPrice : null,
           srpUsd: currency === "USD" ? unitPrice : null,
+          srpJpy: currency === "JPY" ? unitPrice : null,
           fobRate: 0,
           fobUsd: null,
           fobKrw: null,
@@ -2544,7 +2576,7 @@ function renderSales() {
 
   const channelCards = summary.byChannel
     .map((ch) => {
-      const amountStr = formatDualCurrencyTotalsHtml(ch.totalKrw, ch.totalUsd);
+      const amountStr = formatDualCurrencyTotalsHtml(ch.totalKrw, ch.totalUsd, ch.totalJpy);
       const isSelected = salesChannelId === ch.channelId;
       return `
         <button type="button" class="channel-summary-card ${ch.count > 0 ? "active" : ""} ${isSelected ? "selected" : ""}"
@@ -2593,7 +2625,7 @@ function renderSales() {
       <span class="help-icon">📈</span>
       <div>
         <strong>${monthLabel}</strong> 기준 <strong>실제 발주(매출)</strong> 현황입니다.
-        위 <strong>판매국가</strong>를 클릭하면 업체별 발주 상세를 볼 수 있습니다. 원화·달러는 각각 합산됩니다.
+        위 <strong>판매국가</strong>를 클릭하면 업체별 발주 상세를 볼 수 있습니다. 원화·달러·엔화는 각각 합산됩니다.
       </div>
     </div>
 
@@ -2616,7 +2648,7 @@ function renderSales() {
         <span class="highlight-label">${monthLabel} 전체 발주</span>
         <span class="highlight-value">${summary.totalCount}<small>건</small></span>
       </div>
-      <div class="highlight-totals">${formatDualCurrencyTotalsHtml(summary.totalKrw, summary.totalUsd)}</div>
+      <div class="highlight-totals">${formatDualCurrencyTotalsHtml(summary.totalKrw, summary.totalUsd, summary.totalJpy)}</div>
     </div>
 
     ${salesChannelId ? renderSalesChannelDetail(salesChannelId, summary, monthLabel) : ""}

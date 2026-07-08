@@ -67,6 +67,7 @@ function migrateData(data) {
     });
   });
   if (!data.exchangeRate) data.exchangeRate = DEFAULT_EXCHANGE_RATE;
+  if (!data.jpyPerUsd) data.jpyPerUsd = DEFAULT_JPY_PER_USD;
   if (!data.proposals) data.proposals = [];
   data.proposals.forEach((p) => {
     if (!p.recordType) {
@@ -104,6 +105,7 @@ function loadData() {
     channelSrp: structuredClone(DEFAULT_SRP),
     channelTerms: Object.fromEntries(DEFAULT_CHANNELS.map((ch) => [ch.id, [...ch.terms]])),
     exchangeRate: DEFAULT_EXCHANGE_RATE,
+    jpyPerUsd: DEFAULT_JPY_PER_USD,
     proposals: [],
     clients: [],
   });
@@ -360,14 +362,16 @@ function filterProposalsByMonth(proposals, yearMonth) {
 }
 
 function getProposalCurrency(proposal, channel) {
-  if (proposal.priceCurrency === "KRW" || proposal.priceCurrency === "USD") {
+  if (proposal.priceCurrency === "KRW" || proposal.priceCurrency === "USD" || proposal.priceCurrency === "JPY") {
     return proposal.priceCurrency;
   }
   const items = proposal.items || [];
   const hasKrw = items.some((i) => i.srpKrw != null && i.srpKrw > 0);
   const hasUsd = items.some((i) => i.srpUsd != null && i.srpUsd > 0);
-  if (hasKrw && !hasUsd) return "KRW";
-  if (hasUsd && !hasKrw) return "USD";
+  const hasJpy = items.some((i) => i.srpJpy != null && i.srpJpy > 0);
+  if (hasKrw && !hasUsd && !hasJpy) return "KRW";
+  if (hasUsd && !hasKrw && !hasJpy) return "USD";
+  if (hasJpy && !hasKrw && !hasUsd) return "JPY";
   return channel?.currency || "USD";
 }
 
@@ -386,6 +390,7 @@ function buildSalesSummary(data, yearMonth) {
         count: 0,
         totalKrw: 0,
         totalUsd: 0,
+        totalJpy: 0,
         lastDate: "",
         proposals: [],
       };
@@ -394,6 +399,7 @@ function buildSalesSummary(data, yearMonth) {
     const currency = getProposalCurrency(p, ch);
     entry.count += 1;
     if (currency === "KRW") entry.totalKrw += p.totalAmount || 0;
+    else if (currency === "JPY") entry.totalJpy += p.totalAmount || 0;
     else entry.totalUsd += p.totalAmount || 0;
     entry.proposals.push(p);
     const date = getProposalDate(p);
@@ -401,7 +407,7 @@ function buildSalesSummary(data, yearMonth) {
   });
 
   const clients = Object.values(clientMap).sort(
-    (a, b) => b.count - a.count || b.totalKrw + b.totalUsd - (a.totalKrw + a.totalUsd)
+    (a, b) => b.count - a.count || b.totalKrw + b.totalUsd + b.totalJpy - (a.totalKrw + a.totalUsd + a.totalJpy)
   );
 
   const totalKrw = proposals.reduce((sum, p) => {
@@ -413,12 +419,18 @@ function buildSalesSummary(data, yearMonth) {
     return getProposalCurrency(p, ch) === "USD" ? sum + (p.totalAmount || 0) : sum;
   }, 0);
 
+  const totalJpy = proposals.reduce((sum, p) => {
+    const ch = getChannels(data).find((c) => c.id === p.channelId);
+    return getProposalCurrency(p, ch) === "JPY" ? sum + (p.totalAmount || 0) : sum;
+  }, 0);
+
   const byChannel = getChannels(data).map((ch) => {
     const channelProposals = proposals.filter((p) => p.channelId === ch.id);
-    const totals = { krw: 0, usd: 0 };
+    const totals = { krw: 0, usd: 0, jpy: 0 };
     channelProposals.forEach((p) => {
       const currency = getProposalCurrency(p, ch);
       if (currency === "KRW") totals.krw += p.totalAmount || 0;
+      else if (currency === "JPY") totals.jpy += p.totalAmount || 0;
       else totals.usd += p.totalAmount || 0;
     });
     return {
@@ -428,6 +440,7 @@ function buildSalesSummary(data, yearMonth) {
       count: channelProposals.length,
       totalKrw: totals.krw,
       totalUsd: totals.usd,
+      totalJpy: totals.jpy,
       proposals: channelProposals,
       clients: [...new Set(channelProposals.map((p) => p.clientName))],
     };
@@ -438,6 +451,7 @@ function buildSalesSummary(data, yearMonth) {
     totalCount: proposals.length,
     totalKrw,
     totalUsd,
+    totalJpy,
     clients,
     byChannel,
     proposals,
