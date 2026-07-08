@@ -133,18 +133,55 @@ function getDefaultChannelTerms(data, channelId) {
   return ch?.terms ? [...ch.terms] : [];
 }
 
-function addChannel(data, channel) {
-  const id = channel.id?.trim().toUpperCase();
-  if (!id) return { ok: false, error: "국가 코드를 입력해주세요." };
-  if (!/^[A-Z0-9-]+$/.test(id)) {
-    return { ok: false, error: "국가 코드는 영문, 숫자, 하이픈(-)만 사용할 수 있습니다." };
+function generateChannelId(data, name) {
+  const channels = getChannels(data);
+  const existing = new Set(channels.map((c) => c.id));
+
+  const slug = name
+    .trim()
+    .replace(/[^A-Za-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toUpperCase()
+    .slice(0, 24);
+
+  let base = slug;
+  if (!base) {
+    let n = channels.length + 1;
+    base = `CH-${String(n).padStart(3, "0")}`;
+    while (existing.has(base)) {
+      n += 1;
+      base = `CH-${String(n).padStart(3, "0")}`;
+    }
+    return base;
   }
+
+  let candidate = base;
+  let suffix = 2;
+  while (existing.has(candidate)) {
+    candidate = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
+function addChannel(data, channel) {
   const name = channel.name?.trim();
   if (!name) return { ok: false, error: "판매국가명을 입력해주세요." };
 
   const channels = getChannels(data);
+  if (channels.some((c) => c.name === name)) {
+    return { ok: false, error: "이미 등록된 판매국가명입니다." };
+  }
+
+  const manualId = channel.id?.trim().toUpperCase();
+  const id = manualId || generateChannelId(data, name);
+  if (manualId && !/^[A-Z0-9-]+$/.test(id)) {
+    return { ok: false, error: "국가 코드는 영문, 숫자, 하이픈(-)만 사용할 수 있습니다." };
+  }
   if (channels.some((c) => c.id === id)) {
-    return { ok: false, error: "이미 존재하는 국가 코드입니다." };
+    return { ok: false, error: "이미 존재하는 판매국가입니다." };
   }
 
   const currency = channel.currency === "KRW" ? "KRW" : "USD";
@@ -166,7 +203,7 @@ function addChannel(data, channel) {
   if (!data.channelTerms) data.channelTerms = {};
   data.channelTerms[id] = [];
   saveData(data);
-  return { ok: true };
+  return { ok: true, id };
 }
 
 function updateChannel(data, channelId, updates) {
@@ -176,6 +213,9 @@ function updateChannel(data, channelId, updates) {
 
   const name = updates.name?.trim();
   if (!name) return { ok: false, error: "판매국가명을 입력해주세요." };
+  if (channels.some((c) => c.id !== channelId && c.name === name)) {
+    return { ok: false, error: "이미 등록된 판매국가명입니다." };
+  }
 
   const currency = updates.currency === "KRW" ? "KRW" : "USD";
   const fobPercent = parseFloat(updates.defaultFobRate);

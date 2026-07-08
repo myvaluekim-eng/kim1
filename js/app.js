@@ -1847,17 +1847,12 @@ function renderMasterNewChannel() {
   return `
     <div class="card">
       <div class="card-title">신규 판매 국가 등록</div>
-      <p class="card-desc">판매국가를 만든 뒤 같은 화면에서 업체와 거래 조건을 바로 추가할 수 있습니다.</p>
+      <p class="card-desc">판매국가명만 입력하면 됩니다. 등록 후 같은 화면에서 업체와 거래 조건을 바로 추가할 수 있습니다.</p>
       <form id="master-new-channel-form">
         <div class="form-grid form-grid-2">
-          <div class="form-group">
-            <label>국가 코드 *</label>
-            <input type="text" name="id" placeholder="예: US-ULTA, OFFLINE" required pattern="[A-Za-z0-9-]+" title="영문, 숫자, 하이픈">
-            <span class="field-hint">영문·숫자·하이픈 (저장 시 대문자)</span>
-          </div>
-          <div class="form-group">
+          <div class="form-group form-grid-full">
             <label>판매국가명 *</label>
-            <input type="text" name="name" placeholder="예: Ulta Beauty, 오프라인" required>
+            <input type="text" name="name" placeholder="예: Ulta Beauty, 오프라인" required autofocus>
           </div>
           <div class="form-group">
             <label>통화 *</label>
@@ -1899,12 +1894,7 @@ function renderMasterChannelDetail(channelId) {
       <div class="card-title">① 국가 기본 정보</div>
       <form id="master-channel-form">
         <div class="form-grid form-grid-2">
-          <div class="form-group">
-            <label>국가 코드</label>
-            <input type="text" value="${channel.id}" disabled class="input-readonly">
-            <span class="field-hint">코드는 등록 후 변경할 수 없습니다</span>
-          </div>
-          <div class="form-group">
+          <div class="form-group form-grid-full">
             <label>판매국가명 *</label>
             <input type="text" name="name" value="${escapeAttr(channel.name)}" required>
           </div>
@@ -2043,7 +2033,6 @@ function bindMasterEvents() {
     e.preventDefault();
     const fd = new FormData(e.target);
     const result = addChannel(appData, {
-      id: fd.get("id"),
       name: fd.get("name"),
       currency: fd.get("currency"),
       defaultFobRate: fd.get("defaultFobRate"),
@@ -2052,7 +2041,7 @@ function bindMasterEvents() {
       showToast(result.error);
       return;
     }
-    const newId = String(fd.get("id")).trim().toUpperCase();
+    const newId = result.id;
     masterChannelId = newId;
     masterNewChannel = false;
     termsChannelId = newId;
@@ -2154,7 +2143,7 @@ function bindMasterDeleteHandlers() {
     btn.addEventListener("click", async () => {
       const channelId = btn.dataset.deleteChannel;
       const name = btn.dataset.channelName;
-      if (!(await confirmDelete("국가 삭제", `판매국가: ${name}\n코드: ${channelId}`))) return;
+      if (!(await confirmDelete("국가 삭제", `판매국가: ${name}`))) return;
       const result = deleteChannel(appData, channelId);
       if (!result.ok) {
         showToast(result.error);
