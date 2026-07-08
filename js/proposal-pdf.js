@@ -192,7 +192,7 @@ function buildProposalDocumentHtml(proposal) {
           <col class="col-num">
           <col class="col-amount">
         </colgroup>
-        <tbody class="proposal-doc-head">
+        <tbody class="proposal-doc-sheet">
           <tr class="proposal-doc-head-title">
             <td colspan="13">
               <div class="proposal-doc-head-main">PRODUCT &amp; PRICE LIST</div>
@@ -217,33 +217,29 @@ function buildProposalDocumentHtml(proposal) {
             <td class="meta-label">Total</td>
             <td colspan="5">${formatMoney(totals.totalAmount, channel)}</td>
           </tr>
-        </tbody>
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Product</th>
-            <th>Code</th>
-            <th>Size</th>
-            <th>SRP (₩)</th>
-            <th>SRP ($)</th>
-            <th>FOB (₩)</th>
-            <th>FOB ($)</th>
-            <th>MOQ</th>
-            <th>Qty</th>
-            <th>CTN</th>
-            <th>CBM</th>
-            <th>Amount</th>
+          <tr class="proposal-doc-colhead">
+            <td>Category</td>
+            <td>Product</td>
+            <td>Code</td>
+            <td>Size</td>
+            <td>SRP (₩)</td>
+            <td>SRP ($)</td>
+            <td>FOB (₩)</td>
+            <td>FOB ($)</td>
+            <td>MOQ</td>
+            <td>Qty</td>
+            <td>CTN</td>
+            <td>CBM</td>
+            <td>Amount</td>
           </tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-        <tfoot>
-          <tr>
+          ${tableRows}
+          <tr class="proposal-doc-total">
             <td colspan="10" class="total-label">TOTAL</td>
             <td class="num">${formatNumber(totals.totalCtn, 2)}</td>
             <td class="num">${formatNumber(totals.totalCbm, 4)}</td>
             <td class="num">${formatMoney(totals.totalAmount, channel)}</td>
           </tr>
-        </tfoot>
+        </tbody>
       </table>
 
       ${
