@@ -51,6 +51,11 @@ function migrateData(data) {
   });
   if (!data.exchangeRate) data.exchangeRate = DEFAULT_EXCHANGE_RATE;
   if (!data.proposals) data.proposals = [];
+  data.proposals.forEach((p) => {
+    if (!p.recordType) {
+      p.recordType = p.source === "po-upload" ? "order" : "quote";
+    }
+  });
   if (!data.clients) {
     data.clients = [];
     const seen = new Set();
@@ -239,11 +244,30 @@ function setChannelSrp(data, productCode, channelId, srpKrw, srpUsd) {
   };
 }
 
+function getRecordType(record) {
+  if (record?.recordType) return record.recordType;
+  return record?.source === "po-upload" ? "order" : "quote";
+}
+
+function getQuotes(data, channelId) {
+  const list = channelId ? getProposals(data, channelId) : data.proposals;
+  return list.filter((p) => getRecordType(p) === "quote");
+}
+
+function getOrders(data, channelId) {
+  const list = channelId ? getProposals(data, channelId) : data.proposals;
+  return list.filter((p) => getRecordType(p) === "order");
+}
+
 function saveProposal(data, proposal) {
-  const channelProposals = data.proposals.filter((p) => p.channelId === proposal.channelId);
+  const recordType = proposal.recordType || "quote";
+  const channelProposals = data.proposals.filter(
+    (p) => p.channelId === proposal.channelId && getRecordType(p) === recordType
+  );
   const version = channelProposals.length + 1;
   data.proposals.unshift({
     ...proposal,
+    recordType,
     id: Date.now().toString(),
     version,
     createdAt: new Date().toISOString(),
@@ -271,7 +295,7 @@ function filterProposalsByMonth(proposals, yearMonth) {
 }
 
 function buildSalesSummary(data, yearMonth) {
-  const proposals = filterProposalsByMonth(data.proposals, yearMonth);
+  const proposals = filterProposalsByMonth(getOrders(data), yearMonth);
   const clientMap = {};
 
   proposals.forEach((p) => {
@@ -422,7 +446,13 @@ function clearChannelTerms(data, channelId) {
 }
 
 function getClientProposalCount(data, client) {
-  return data.proposals.filter(
+  return getQuotes(data).filter(
+    (p) => p.channelId === client.channelId && p.clientName === client.name
+  ).length;
+}
+
+function getClientOrderCount(data, client) {
+  return getOrders(data).filter(
     (p) => p.channelId === client.channelId && p.clientName === client.name
   ).length;
 }

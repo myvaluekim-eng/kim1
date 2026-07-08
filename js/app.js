@@ -26,7 +26,9 @@ function freshPoUploadState() {
     poNumber: "",
     fileName: "",
     fileKind: "",
+    mode: "file",
     rows: [],
+    manualItems: {},
     status: "idle",
     statusMsg: "",
     warning: "",
@@ -258,7 +260,7 @@ function setupGlobalDeleteHandlers() {
       const ch = getChannelList().find((c) => c.id === proposal.channelId);
       if (
         !(await confirmDelete(
-          "단가표 삭제",
+          getRecordType(proposal) === "order" ? "발주서 삭제" : "단가표 삭제",
           `업체: ${proposal.clientName}\n채널: ${ch?.name}\n버전: v${proposal.version}\n작성일: ${proposal.poDate}`
         ))
       ) {
@@ -269,7 +271,7 @@ function setupGlobalDeleteHandlers() {
         showToast(result.error);
         return;
       }
-      showToast("단가표가 삭제되었습니다");
+      showToast(getRecordType(proposal) === "order" ? "발주서가 삭제되었습니다" : "단가표가 삭제되었습니다");
       render();
     }
   });
@@ -277,15 +279,15 @@ function setupGlobalDeleteHandlers() {
 
 const PAGE_META = {
   dashboard: { title: "시작하기", desc: "무엇을 하실지 선택하세요. 처음이시면 아래 순서를 따라하시면 됩니다." },
-  proposal: { title: "단가표 만들기", desc: "① 채널·업체 입력 → ② 가격 확인 → ③ 저장 버튼 클릭" },
-  poupload: { title: "발주서 등록", desc: "발주서 파일(엑셀) 또는 이미지를 올리면 자동으로 인식해 영업 현황에 반영합니다." },
+  proposal: { title: "단가표 만들기", desc: "바이어에게 전달할 가격표를 작성합니다. 매출 발생 전 견적이며 영업 현황에는 포함되지 않습니다." },
+  poupload: { title: "발주서 등록", desc: "실제 발주를 파일 업로드 또는 수기 입력으로 등록합니다. 저장 시 영업 현황(매출)에 반영됩니다." },
   products: { title: "제품 등록", desc: "새로 출시된 제품을 등록하거나 기존 제품을 관리합니다." },
   master: {
     title: "거래처 통합 등록",
     desc: "판매채널, 거래 업체, 거래 조건을 한 화면에서 등록·수정합니다.",
   },
   srp: { title: "소비자가 설정", desc: "채널별 권장 소비자가를 미리 입력해 두면 단가표에 자동으로 채워집니다." },
-  history: { title: "지난 단가표", desc: "이전에 저장한 단가표를 다시 확인하거나 엑셀로 다운로드합니다." },
+  history: { title: "지난 단가표", desc: "바이어에게 보낸 단가표(견적) 이력만 모아 봅니다. 발주서는 영업 현황에서 확인합니다." },
   sales: { title: "영업 현황", desc: "이번 달 업체별·채널별 발주 건수와 금액을 한눈에 확인합니다." },
 };
 
@@ -417,11 +419,11 @@ function setupClientModal() {
 
 function renderDashboard() {
   const products = getProducts(appData);
-  const totalProposals = appData.proposals.length;
   const channels = getChannelList();
+  const totalQuotes = getQuotes(appData).length;
   const byChannel = channels.map((ch) => ({
     ...ch,
-    count: appData.proposals.filter((p) => p.channelId === ch.id).length,
+    count: getQuotes(appData, ch.id).length,
   }));
 
   return `
@@ -429,12 +431,12 @@ function renderDashboard() {
       <button class="action-card primary" onclick="setView('proposal')">
         <div class="action-icon">📋</div>
         <div class="action-title">단가표 만들기</div>
-        <div class="action-desc">업체에 보낼 가격표를 작성하고 저장합니다</div>
+        <div class="action-desc">바이어용 가격표 작성 (견적)</div>
       </button>
       <button class="action-card" onclick="setView('poupload')">
         <div class="action-icon">🧾</div>
         <div class="action-title">발주서 등록</div>
-        <div class="action-desc">발주서 파일이나 이미지를 올리면 자동으로 인식합니다</div>
+        <div class="action-desc">실제 발주 등록 → 영업 현황 반영</div>
       </button>
       <button class="action-card" onclick="setView('history')">
         <div class="action-icon">🕐</div>
@@ -489,14 +491,14 @@ function renderDashboard() {
       </div>
       <div class="stat-card">
         <div class="label">저장된 단가표</div>
-        <div class="value">${totalProposals}<span style="font-size:16px">건</span></div>
+        <div class="value">${totalQuotes}<span style="font-size:16px">건</span></div>
       </div>
       <div class="stat-card">
         <div class="label">최근 작성일</div>
         <div class="value" style="font-size:18px;padding-top:4px">
-          ${appData.proposals[0] ? new Date(appData.proposals[0].createdAt).toLocaleDateString("ko-KR") : "—"}
+          ${getQuotes(appData)[0] ? new Date(getQuotes(appData)[0].createdAt).toLocaleDateString("ko-KR") : "—"}
         </div>
-        <div class="sub">${appData.proposals[0]?.clientName || "아직 없음"}</div>
+        <div class="sub">${getQuotes(appData)[0]?.clientName || "아직 없음"}</div>
       </div>
     </div>
 
@@ -623,7 +625,7 @@ function renderProposal() {
     <div class="help-box no-print">
       <span class="help-icon">💡</span>
       <div>
-        <strong>입력 방법</strong><br>
+        <strong>단가표 = 견적</strong> · 바이어에게 보내는 가격표입니다. 저장해도 <strong>영업 현황(매출)에는 포함되지 않습니다.</strong><br>
         노란 칸(소비자가, 주문수량)만 직접 입력하세요. 파란 칸(FOB, 금액)은 자동으로 계산됩니다.
       </div>
     </div>
@@ -837,8 +839,9 @@ function bindProposalEvents() {
       items,
       totalAmount,
       terms,
+      recordType: "quote",
     });
-    showToast(`저장 완료 — v${version}`);
+    showToast(`단가표 저장 완료 — v${version} (지난 단가표에서 확인)`);
   });
 
   document.getElementById("btn-print").addEventListener("click", () => window.print());
@@ -972,6 +975,103 @@ function renderPoRow(r, i) {
   `;
 }
 
+function initPoManualItems(channelId) {
+  const channel = findChannel(channelId);
+  const items = {};
+  getProducts(appData).forEach((p) => {
+    const srp = getChannelSrp(appData, p.code, channelId);
+    const unitPrice = channel.currency === "KRW" ? srp.krw : srp.usd;
+    items[p.code] = { qty: 0, unitPrice: unitPrice ?? null, amount: 0 };
+  });
+  return items;
+}
+
+function updatePoManualCalcs(channel) {
+  let totalAmount = 0;
+  getProducts(appData).forEach((p) => {
+    const item = poUploadState.manualItems[p.code] || { qty: 0, unitPrice: null, amount: 0 };
+    const qty = item.qty || 0;
+    const unitPrice = item.unitPrice;
+    const amount = unitPrice != null && qty > 0 ? qty * unitPrice : item.amount || 0;
+    item.amount = amount;
+    poUploadState.manualItems[p.code] = item;
+    if (qty > 0 || amount > 0) totalAmount += amount;
+
+    const amountEl = document.querySelector(`[data-po-manual-amount="${p.code}"]`);
+    if (amountEl) amountEl.textContent = formatMoney(amount, channel);
+  });
+  const totalEl = document.getElementById("po-manual-total-amount");
+  if (totalEl) totalEl.textContent = formatMoney(totalAmount, channel);
+}
+
+function renderPoManualSection(channel) {
+  const products = getProducts(appData);
+  if (!Object.keys(poUploadState.manualItems).length) {
+    poUploadState.manualItems = initPoManualItems(poUploadState.channelId);
+  }
+
+  let totalAmount = 0;
+  const rows = products
+    .map((p) => {
+      const item = poUploadState.manualItems[p.code] || { qty: 0, unitPrice: null, amount: 0 };
+      const qty = item.qty || 0;
+      const unitPrice = item.unitPrice;
+      const amount = unitPrice != null && qty > 0 ? qty * unitPrice : item.amount || 0;
+      if (qty > 0 || amount > 0) totalAmount += amount;
+      return `
+      <tr data-po-manual-code="${p.code}">
+        <td>${p.category}</td>
+        <td><strong>${p.nameKor}</strong></td>
+        <td><code>${p.code}</code></td>
+        <td class="editable">
+          <input class="input-cell qty" type="number" step="1" min="0"
+            data-po-manual-field="qty" data-code="${p.code}" value="${qty || ""}" placeholder="0">
+        </td>
+        <td class="editable">
+          <input class="input-cell" type="number" step="1" min="0"
+            data-po-manual-field="unitPrice" data-code="${p.code}" value="${unitPrice ?? ""}" placeholder="0">
+        </td>
+        <td class="auto" data-po-manual-amount="${p.code}">${formatMoney(amount, channel)}</td>
+      </tr>`;
+    })
+    .join("");
+
+  return `
+    <div class="section-block">
+      <div class="section-label">③ 제품별 발주 수기 입력</div>
+      <p class="card-desc no-print">단가표 만들기처럼 제품 목록에서 발주수량·단가를 입력하세요. 금액은 자동 계산됩니다.</p>
+      <div class="legend-bar no-print">
+        <span class="legend-item"><span class="legend-swatch editable"></span> 직접 입력</span>
+        <span class="legend-item"><span class="legend-swatch auto"></span> 자동 계산</span>
+      </div>
+      <div class="table-wrap">
+        <table class="po-manual-table">
+          <thead>
+            <tr>
+              <th>분류</th>
+              <th>제품명</th>
+              <th>제품코드</th>
+              <th class="col-editable">발주수량</th>
+              <th class="col-editable">단가</th>
+              <th class="col-auto">금액</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5" style="text-align:right;font-weight:700">합계</td>
+              <td class="total-row" id="po-manual-total-amount">${formatMoney(totalAmount, channel)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px">
+        <button class="btn btn-success btn-lg" id="po-btn-save">💾 저장하고 영업 현황 반영</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderPoUpload() {
   const channel = findChannel(poUploadState.channelId);
   const channelClients = getClients(appData, poUploadState.channelId);
@@ -982,8 +1082,8 @@ function renderPoUpload() {
     <div class="help-box no-print">
       <span class="help-icon">🧾</span>
       <div>
-        <strong>발주서 업로드</strong><br>
-        올리브영 <strong>구매발주서</strong>에서 <strong>품명 · 발주수량 · 단가 · 금액</strong>을 자동 인식합니다.
+        <strong>발주서 = 매출</strong> · 실제 발주가 들어온 건을 등록합니다. 저장하면 <strong>영업 현황에 반영</strong>됩니다.<br>
+        파일 업로드(OCR/엑셀) 또는 제품별 수기 입력 중 선택하세요.
       </div>
     </div>
 
@@ -1009,7 +1109,7 @@ function renderPoUpload() {
           }
         </div>
         <div class="form-group">
-          <label>작성일</label>
+          <label>발주일</label>
           <input type="date" id="po-date" value="${poUploadState.poDate}">
         </div>
         <div class="form-group">
@@ -1020,7 +1120,19 @@ function renderPoUpload() {
     </div>
 
     <div class="section-block no-print">
-      <div class="section-label">② 발주서 파일 업로드</div>
+      <div class="section-label">② 입력 방식</div>
+      <div class="po-mode-tabs">
+        <button type="button" class="po-mode-tab${poUploadState.mode === "file" ? " active" : ""}" data-po-mode="file">📎 파일 업로드</button>
+        <button type="button" class="po-mode-tab${poUploadState.mode === "manual" ? " active" : ""}" data-po-mode="manual">✏️ 수기 입력</button>
+      </div>
+    </div>
+
+    ${
+      poUploadState.mode === "manual"
+        ? renderPoManualSection(channel)
+        : `
+    <div class="section-block no-print">
+      <div class="section-label">③ 발주서 파일 업로드</div>
       <div class="po-dropzone" id="po-dropzone">
         <input type="file" id="po-file-input" accept=".xlsx,.xls,.csv,image/*,.png,.jpg,.jpeg" hidden>
         <div class="po-dropzone-icon">📎</div>
@@ -1037,15 +1149,14 @@ function renderPoUpload() {
       ${poUploadState.warning ? `<div class="po-status po-status-warn">⚠️ ${poUploadState.warning}</div>` : ""}
     </div>
 
-    ${
-      poUploadState.status === "done" || rows.length
-        ? renderPoReviewSection(channel, rows)
-        : ""
+    ${poUploadState.status === "done" || rows.length ? renderPoReviewSection(channel, rows) : ""}
+    `
     }
   `;
 }
 
 function handlePoFile(file) {
+  poUploadState.mode = "file";
   poUploadState.fileName = file.name;
   poUploadState.status = "parsing";
   poUploadState.statusMsg = "";
@@ -1123,47 +1234,78 @@ function savePoUpload() {
     showToast("업체를 선택하거나 + 신규로 등록해주세요");
     return;
   }
-  if (!poUploadState.rows.length) {
-    showToast("인식된 품목이 없습니다. 품명·수량·단가·금액을 확인해주세요");
-    return;
-  }
-  const emptyRows = poUploadState.rows.filter((r) => !r.name?.trim() || (r.qty == null && r.amount == null));
-  if (emptyRows.length) {
-    showToast("품명 또는 수량·금액이 비어 있는 행이 있습니다");
-    return;
-  }
-  const unmatched = poUploadState.rows.filter((r) => !r.matchedCode);
-  if (unmatched.length) {
-    poUploadState.warning = [
-      poUploadState.warning,
-      `제품 매칭 안 됨 ${unmatched.length}건 — 품번·품명으로 저장됩니다.`,
-    ]
-      .filter(Boolean)
-      .join(" ");
-  }
 
   const channel = findChannel(poUploadState.channelId);
   const terms = getChannelTerms(appData, poUploadState.channelId);
   const products = getProducts(appData);
-  const items = poUploadState.rows.map((r) => {
-    const product = products.find((p) => p.code === r.matchedCode);
-    const qty = r.qty ?? 0;
-    const amount = r.amount ?? (r.unitPrice != null ? r.unitPrice * qty : 0);
-    return {
-      productCode: r.matchedCode || `PO-${r.barcode || r.name?.slice(0, 10) || Date.now()}`,
-      nameKor: product?.nameKor || r.name || r.barcode,
-      srpKrw: channel.currency === "KRW" ? r.unitPrice : null,
-      srpUsd: channel.currency === "USD" ? r.unitPrice : null,
-      fobRate: 0,
-      fobUsd: null,
-      fobKrw: null,
-      poQty: qty,
-      amount,
-      poBarcode: r.barcode,
-    };
-  });
-  const totalAmount = items.reduce((s, i) => s + i.amount, 0);
+  let items = [];
+  let source = "po-upload";
 
+  if (poUploadState.mode === "manual") {
+    items = products
+      .map((p) => {
+        const item = poUploadState.manualItems[p.code] || { qty: 0, unitPrice: null, amount: 0 };
+        const qty = item.qty || 0;
+        const unitPrice = item.unitPrice;
+        const amount = unitPrice != null && qty > 0 ? qty * unitPrice : item.amount || 0;
+        if (qty <= 0 && amount <= 0) return null;
+        return {
+          productCode: p.code,
+          nameKor: p.nameKor,
+          srpKrw: channel.currency === "KRW" ? unitPrice : null,
+          srpUsd: channel.currency === "USD" ? unitPrice : null,
+          fobRate: 0,
+          fobUsd: null,
+          fobKrw: null,
+          poQty: qty,
+          amount,
+        };
+      })
+      .filter(Boolean);
+    source = "po-manual";
+    if (!items.length) {
+      showToast("발주수량 또는 금액이 입력된 제품이 없습니다");
+      return;
+    }
+  } else {
+    if (!poUploadState.rows.length) {
+      showToast("인식된 품목이 없습니다. 품명·수량·단가·금액을 확인해주세요");
+      return;
+    }
+    const emptyRows = poUploadState.rows.filter((r) => !r.name?.trim() || (r.qty == null && r.amount == null));
+    if (emptyRows.length) {
+      showToast("품명 또는 수량·금액이 비어 있는 행이 있습니다");
+      return;
+    }
+    const unmatched = poUploadState.rows.filter((r) => !r.matchedCode);
+    if (unmatched.length) {
+      poUploadState.warning = [
+        poUploadState.warning,
+        `제품 매칭 안 됨 ${unmatched.length}건 — 품번·품명으로 저장됩니다.`,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    }
+    items = poUploadState.rows.map((r) => {
+      const product = products.find((p) => p.code === r.matchedCode);
+      const qty = r.qty ?? 0;
+      const amount = r.amount ?? (r.unitPrice != null ? r.unitPrice * qty : 0);
+      return {
+        productCode: r.matchedCode || `PO-${r.barcode || r.name?.slice(0, 10) || Date.now()}`,
+        nameKor: product?.nameKor || r.name || r.barcode,
+        srpKrw: channel.currency === "KRW" ? r.unitPrice : null,
+        srpUsd: channel.currency === "USD" ? r.unitPrice : null,
+        fobRate: 0,
+        fobUsd: null,
+        fobKrw: null,
+        poQty: qty,
+        amount,
+        poBarcode: r.barcode,
+      };
+    });
+  }
+
+  const totalAmount = items.reduce((s, i) => s + i.amount, 0);
   const version = saveProposal(appData, {
     channelId: poUploadState.channelId,
     clientName: poUploadState.clientName,
@@ -1174,11 +1316,12 @@ function savePoUpload() {
     items,
     totalAmount,
     terms,
-    source: "po-upload",
+    recordType: "order",
+    source,
     sourceFileName: poUploadState.fileName,
   });
 
-  showToast(`발주서가 저장되었습니다 — v${version}`);
+  showToast(`발주서가 저장되었습니다 — v${version} (영업 현황 반영)`);
   poUploadState = freshPoUploadState();
   setView("sales");
 }
@@ -1187,7 +1330,34 @@ function bindPoUploadEvents() {
   document.getElementById("po-channel-select").addEventListener("change", (e) => {
     poUploadState.channelId = e.target.value;
     poUploadState.clientName = "";
+    if (poUploadState.mode === "manual") {
+      poUploadState.manualItems = initPoManualItems(poUploadState.channelId);
+    }
     render();
+  });
+
+  document.querySelectorAll("[data-po-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.poMode;
+      poUploadState.mode = mode;
+      if (mode === "manual" && !Object.keys(poUploadState.manualItems).length) {
+        poUploadState.manualItems = initPoManualItems(poUploadState.channelId);
+      }
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-po-manual-field]").forEach((input) => {
+    input.addEventListener("input", (e) => {
+      const code = e.target.dataset.code;
+      const field = e.target.dataset.poManualField;
+      if (!poUploadState.manualItems[code]) {
+        poUploadState.manualItems[code] = { qty: 0, unitPrice: null, amount: 0 };
+      }
+      poUploadState.manualItems[code][field] =
+        field === "qty" ? parseFloat(e.target.value) || 0 : parseOptionalNumber(e.target.value);
+      updatePoManualCalcs(findChannel(poUploadState.channelId));
+    });
   });
 
   const clientSelect = document.getElementById("po-client-select");
@@ -1214,22 +1384,24 @@ function bindPoUploadEvents() {
 
   const dropzone = document.getElementById("po-dropzone");
   const fileInput = document.getElementById("po-file-input");
-  dropzone.addEventListener("click", () => fileInput.click());
-  dropzone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    dropzone.classList.add("dragover");
-  });
-  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
-  dropzone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    dropzone.classList.remove("dragover");
-    const file = e.dataTransfer.files?.[0];
-    if (file) handlePoFile(file);
-  });
-  fileInput.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    if (file) handlePoFile(file);
-  });
+  if (dropzone && fileInput) {
+    dropzone.addEventListener("click", () => fileInput.click());
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+      const file = e.dataTransfer.files?.[0];
+      if (file) handlePoFile(file);
+    });
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if (file) handlePoFile(file);
+    });
+  }
 
   document.querySelectorAll("[data-po-field]").forEach((el) => {
     const evt = el.tagName === "SELECT" ? "change" : "input";
@@ -1604,19 +1776,22 @@ function renderMasterChannelDetail(channelId) {
               <th>담당자/연락처</th>
               <th>메모</th>
               <th>단가표</th>
+              <th>발주</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             ${clients
               .map((c) => {
-                const count = getClientProposalCount(appData, c);
+                const quoteCount = getClientProposalCount(appData, c);
+                const orderCount = getClientOrderCount(appData, c);
                 return `
               <tr class="${c.id === masterEditClientId ? "row-editing" : ""}">
                 <td><strong>${c.name}</strong></td>
                 <td>${c.contact || "—"}</td>
                 <td style="font-size:13px;color:var(--text-muted)">${c.memo || "—"}</td>
-                <td>${count > 0 ? `<span class="count-badge">${count}건</span>` : "—"}</td>
+                <td>${quoteCount > 0 ? `<span class="count-badge">${quoteCount}건</span>` : "—"}</td>
+                <td>${orderCount > 0 ? `<span class="count-badge">${orderCount}건</span>` : "—"}</td>
                 <td class="master-row-actions">
                   <button type="button" class="btn btn-secondary btn-sm" data-edit-client="${c.id}">수정</button>
                   <button type="button" class="btn btn-danger btn-sm" data-delete-client="${c.id}" data-client-name="${c.name}" data-proposal-count="${count}">삭제</button>
@@ -1926,7 +2101,7 @@ function bindSrpEvents() {
 
 function renderHistory() {
   const filterChannel = historyFilter;
-  const proposals = getProposals(appData, filterChannel || null);
+  const proposals = getQuotes(appData, filterChannel || null);
 
   if (proposals.length === 0) {
     return `
@@ -1971,7 +2146,6 @@ function renderHistory() {
           <div class="history-item">
             <div class="history-meta">
               ${channelBadge(p.channelId)}
-              ${p.source === "po-upload" ? `<span class="badge badge-default">발주서</span>` : ""}
               <span class="version">v${p.version}</span>
               <span>${p.clientName}</span>
               <span class="date">${p.poDate} · FOB ${p.fobRate}%</span>
@@ -2114,7 +2288,8 @@ function renderSales() {
       <div class="card">
         <div class="empty-state">
           <div class="empty-icon">📈</div>
-          ${monthLabel}에 저장된 발주(단가표)가 없습니다.
+          ${monthLabel}에 등록된 발주서가 없습니다.<br>
+          <button class="btn btn-primary" style="margin-top:16px" onclick="setView('poupload')">발주서 등록 →</button>
         </div>
       </div>
     `;
@@ -2142,8 +2317,8 @@ function renderSales() {
     <div class="help-box no-print">
       <span class="help-icon">📈</span>
       <div>
-        <strong>${monthLabel}</strong> 기준 업체별 발주 현황입니다.
-        저장된 단가표 1건 = 발주 1건으로 집계됩니다. 대표님이 채널별 실적을 빠르게 확인할 수 있습니다.
+        <strong>${monthLabel}</strong> 기준 업체별 <strong>실제 발주(매출)</strong> 현황입니다.
+        발주서 1건 = 매출 1건으로 집계됩니다. 단가표(견적)는 포함되지 않습니다.
       </div>
     </div>
 
@@ -2223,9 +2398,10 @@ function bindSalesEvents() {
               (p) => `
             <div class="history-item">
               <div class="history-meta">
+                <span class="badge badge-default">발주</span>
                 <span class="version">v${p.version}</span>
                 <span class="date">${p.poDate}</span>
-                <span>FOB ${p.fobRate}%</span>
+                ${p.poNumber ? `<span>발주번호 ${p.poNumber}</span>` : ""}
                 <span class="date">${formatMoney(p.totalAmount, ch)}</span>
               </div>
               <div class="history-actions no-print">
@@ -2240,11 +2416,45 @@ function bindSalesEvents() {
       `;
       detail.querySelectorAll("[data-view-proposal]").forEach((b) => {
         b.addEventListener("click", () => {
-          historyFilter = channelId;
-          setView("history");
-          setTimeout(() => {
-            document.querySelector(`[data-view-id="${b.dataset.viewProposal}"]`)?.click();
-          }, 100);
+          const proposal = getProposalById(appData, b.dataset.viewProposal);
+          if (!proposal) return;
+          if (getRecordType(proposal) === "quote") {
+            historyFilter = channelId;
+            setView("history");
+            setTimeout(() => {
+              document.querySelector(`[data-view-id="${b.dataset.viewProposal}"]`)?.click();
+            }, 100);
+            return;
+          }
+          const ch = getChannelList().find((c) => c.id === proposal.channelId);
+          detail.innerHTML = `
+            <div class="card" style="margin-top:20px">
+              <div class="card-title">발주 상세 — ${proposal.clientName} · ${proposal.poDate}</div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>제품코드</th><th>제품명</th><th>발주수량</th><th>단가</th><th>금액</th></tr>
+                  </thead>
+                  <tbody>
+                    ${proposal.items.map((item) => `
+                      <tr>
+                        <td><code>${item.productCode}</code></td>
+                        <td>${item.nameKor}</td>
+                        <td>${item.poQty}</td>
+                        <td>${formatMoney(item.srpKrw ?? item.srpUsd ?? 0, ch)}</td>
+                        <td>${formatMoney(item.amount, ch)}</td>
+                      </tr>`).join("")}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="4" style="text-align:right;font-weight:700">Total</td>
+                      <td class="total-row">${formatMoney(proposal.totalAmount, ch)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>`;
+          detail.scrollIntoView({ behavior: "smooth" });
         });
       });
       detail.scrollIntoView({ behavior: "smooth" });
