@@ -273,10 +273,13 @@ async function exportProposalToPdf(proposal) {
   container.innerHTML = buildProposalDocumentHtml(proposal);
   document.body.appendChild(container);
 
+  const el = container.querySelector(".proposal-doc");
+  window.scrollTo(0, 0);
+
   try {
     await html2pdf()
       .set({
-        margin: [3, 6, 6, 6],
+        margin: [1, 6, 6, 6],
         filename: getProposalPdfFilename(proposal),
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
@@ -285,11 +288,14 @@ async function exportProposalToPdf(proposal) {
           letterRendering: true,
           logging: false,
           backgroundColor: "#ffffff",
+          scrollX: 0,
+          scrollY: 0,
+          y: 0,
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
         pagebreak: { mode: ["css", "legacy"], avoid: ".proposal-doc-terms" },
       })
-      .from(container.querySelector(".proposal-doc"))
+      .from(el)
       .save();
   } finally {
     container.remove();
