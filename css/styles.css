@@ -76,6 +76,24 @@ body {
   gap: 14px;
 }
 
+.sidebar-logo-btn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.sidebar-logo-btn:hover {
+  background: var(--primary-light);
+}
+
+.sidebar-logo-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
 .logo-mark {
   min-width: 52px;
   height: 36px;
@@ -135,6 +153,32 @@ body {
 
 .nav-section-main {
   margin-bottom: 22px;
+}
+
+.nav-section-home {
+  margin-bottom: 18px;
+}
+
+.nav-item-home {
+  background: linear-gradient(135deg, #fff 0%, var(--accent-light) 100%);
+  border: 1px solid var(--accent-soft) !important;
+  padding: 13px 16px;
+}
+
+.nav-item-home:hover {
+  border-color: var(--accent) !important;
+}
+
+.nav-item-home.active {
+  background: linear-gradient(135deg, var(--accent) 0%, #b88468 100%);
+  border-color: var(--accent) !important;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(201, 149, 122, 0.28);
+}
+
+.nav-item-home.active .nav-text strong,
+.nav-item-home.active .nav-text small {
+  color: #fff;
 }
 
 .nav-section-main .nav-section-label {
@@ -301,7 +345,49 @@ body {
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  min-width: 0;
+}
+
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.topbar-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.topbar-nav-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.topbar-nav-btn-home:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.topbar-nav-label {
+  font-size: 12px;
+}
+
+.topbar-titles {
+  min-width: 0;
 }
 
 .menu-toggle {
@@ -2113,6 +2199,8 @@ tr.row-editing td {
   }
   .main { margin-left: 0; }
   .menu-toggle { display: flex; align-items: center; justify-content: center; }
+  .topbar-nav-label { display: none; }
+  .topbar-nav-btn { padding: 0 10px; min-width: 38px; justify-content: center; }
   .content { padding: 20px 16px; }
   .topbar { padding: 14px 16px; }
   .stats-grid { grid-template-columns: 1fr; }

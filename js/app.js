@@ -469,7 +469,7 @@ function setupGlobalDeleteHandlers() {
 }
 
 const PAGE_META = {
-  dashboard: { title: "시작하기", desc: "Barle 영업 관리 홈입니다. 단가표·발주가 메인 업무이고, 데이터 등록은 처음 한 번만 설정하면 됩니다." },
+  dashboard: { title: "홈", desc: "Barle 영업 관리 홈입니다. 단가표·발주가 메인 업무이고, 데이터 등록은 처음 한 번만 설정하면 됩니다." },
   proposal: { title: "단가표 만들기", desc: "바이어에게 보낼 견적 · 가격표를 작성합니다. 저장해도 매출에는 반영되지 않습니다." },
   poupload: { title: "발주서 등록", desc: "수기 입력 또는 파일 업로드로 발주를 등록합니다. 저장 시 영업 현황에 반영됩니다." },
   products: { title: "제품 등록", desc: "품목과 가격 정보를 등록합니다. 단가표·발주서 작성 전에 준비해 두세요." },
@@ -482,8 +482,29 @@ const PAGE_META = {
   sales: { title: "영업 현황", desc: "월별 발주 건수와 금액을 국가·업체별로 확인합니다." },
 };
 
-function setView(view) {
+function parseViewFromHash() {
+  const hash = location.hash.replace(/^#/, "").trim();
+  if (!hash) return "dashboard";
+  if (hash === "channels" || hash === "clients" || hash === "terms") return "master";
+  return PAGE_META[hash] ? hash : "dashboard";
+}
+
+function updateTopbarNav() {
+  const onHome = currentView === "dashboard";
+  const backBtn = document.getElementById("btn-nav-back");
+  const homeBtn = document.getElementById("btn-nav-home");
+  if (backBtn) backBtn.hidden = onHome;
+  if (homeBtn) homeBtn.hidden = onHome;
+}
+
+function setView(view, options = {}) {
+  const { skipHistory = false } = options;
   if (view === "channels" || view === "clients" || view === "terms") view = "master";
+
+  if (!skipHistory && view !== currentView) {
+    history.pushState({ view }, "", `#${view}`);
+  }
+
   currentView = view;
   document.querySelectorAll(".nav-item").forEach((el) => {
     el.classList.toggle("active", el.dataset.view === view);
@@ -493,6 +514,7 @@ function setView(view) {
   document.getElementById("page-desc").textContent = meta.desc;
   document.getElementById("sidebar")?.classList.remove("open");
   document.getElementById("sidebar-overlay")?.classList.remove("open");
+  updateTopbarNav();
   try {
     render();
   } catch (err) {
@@ -503,6 +525,21 @@ function setView(view) {
     }
     showToast("화면 로딩 오류 — 새로고침 해주세요");
   }
+}
+
+function goBack() {
+  if (currentView === "dashboard") return;
+  if (history.length > 1) {
+    history.back();
+    return;
+  }
+  goHome();
+}
+
+function goHome() {
+  setView("dashboard", { skipHistory: true });
+  history.replaceState({ view: "dashboard" }, "", "#dashboard");
+  updateTopbarNav();
 }
 
 function render() {
@@ -634,8 +671,8 @@ function renderDashboard() {
   return `
     <div class="dashboard-hero no-print">
       <p class="dashboard-hero-eyebrow">Barle Cosmetics</p>
-      <h2>영업 업무를 간편하게</h2>
-      <p>단가표 작성과 발주서 등록이 메인 업무입니다. 데이터 등록은 처음 한 번만 설정하면 됩니다.</p>
+      <h2>영업 관리 홈</h2>
+      <p>단가표 작성과 발주서 등록이 메인 업무입니다. 아래에서 바로 시작하거나, 데이터 등록을 먼저 설정하세요.</p>
     </div>
 
     <div class="dashboard-section no-print">
@@ -2748,11 +2785,35 @@ function openProposal(channelId) {
   setView("proposal");
 }
 
+function setupAppNavigation() {
+  document.getElementById("btn-nav-back")?.addEventListener("click", goBack);
+  document.getElementById("btn-nav-home")?.addEventListener("click", goHome);
+
+  const sidebarHome = document.getElementById("btn-sidebar-home");
+  sidebarHome?.addEventListener("click", goHome);
+  sidebarHome?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      goHome();
+    }
+  });
+
+  window.addEventListener("popstate", (e) => {
+    const view = e.state?.view || parseViewFromHash();
+    setView(view, { skipHistory: true });
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initProposalState("CN");
   setupGlobalDeleteHandlers();
   setupClientModal();
   setupSidebarNav();
+  setupAppNavigation();
+
+  const initialView = parseViewFromHash();
+  history.replaceState({ view: initialView }, "", `#${initialView}`);
+  setView(initialView, { skipHistory: true });
 
   document.getElementById("menu-toggle")?.addEventListener("click", () => {
     document.getElementById("sidebar").classList.toggle("open");
@@ -2763,13 +2824,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("sidebar").classList.remove("open");
     document.getElementById("sidebar-overlay").classList.remove("open");
   });
-
-  const meta = PAGE_META.dashboard;
-  document.getElementById("page-title").textContent = meta.title;
-  document.getElementById("page-desc").textContent = meta.desc;
-  render();
 });
 
 window.setView = setView;
+window.goBack = goBack;
+window.goHome = goHome;
 window.openMaster = openMaster;
 window.openProposal = openProposal;

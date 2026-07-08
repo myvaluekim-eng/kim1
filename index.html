@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <script>
       (function () {
-        window.APP_BUILD = "2026-07-09-v23";
+        window.APP_BUILD = "2026-07-09-v24";
         var key = "barle-app-build";
         var saved = localStorage.getItem(key);
         if (saved !== window.APP_BUILD) {
@@ -37,11 +37,11 @@
         });
       })();
     </script>
-    <link rel="stylesheet" href="css/styles.css?v=23" />
+    <link rel="stylesheet" href="css/styles.css?v=24" />
   </head>
   <body>
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-logo">
+      <div class="sidebar-logo sidebar-logo-btn" id="btn-sidebar-home" role="button" tabindex="0" aria-label="홈으로">
         <div class="logo-mark">Barle</div>
         <div>
           <h1>영업 관리</h1>
@@ -50,6 +50,16 @@
       </div>
 
       <nav class="sidebar-nav">
+        <div class="nav-section nav-section-home">
+          <button class="nav-item nav-item-home" data-view="dashboard">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-text">
+              <strong>홈</strong>
+              <small>업무 바로가기 · 요약</small>
+            </span>
+          </button>
+        </div>
+
         <div class="nav-section nav-section-main">
           <p class="nav-section-label">메인 업무</p>
           <button class="nav-item nav-item-main" data-view="proposal">
@@ -111,13 +121,6 @@
                 <small>국가별 권장가 (선택)</small>
               </span>
             </button>
-            <button class="nav-item nav-item-data" data-view="dashboard">
-              <span class="nav-icon">🏠</span>
-              <span class="nav-text">
-                <strong>시작하기</strong>
-                <small>안내 · 바로가기</small>
-              </span>
-            </button>
           </div>
         </div>
       </nav>
@@ -135,8 +138,18 @@
       <header class="topbar">
         <div class="topbar-left">
           <button class="menu-toggle no-print" id="menu-toggle" aria-label="메뉴 열기">☰</button>
-          <div>
-            <h2 id="page-title">시작하기</h2>
+          <div class="topbar-nav no-print" id="topbar-nav">
+            <button type="button" class="topbar-nav-btn" id="btn-nav-back" aria-label="뒤로가기" hidden>
+              <span aria-hidden="true">←</span>
+              <span class="topbar-nav-label">뒤로</span>
+            </button>
+            <button type="button" class="topbar-nav-btn topbar-nav-btn-home" id="btn-nav-home" aria-label="홈" hidden>
+              <span aria-hidden="true">🏠</span>
+              <span class="topbar-nav-label">홈</span>
+            </button>
+          </div>
+          <div class="topbar-titles">
+            <h2 id="page-title">홈</h2>
             <p id="page-desc">Barle 영업 관리 홈입니다.</p>
           </div>
         </div>
@@ -202,11 +215,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
-    <script src="js/data.js?v=23"></script>
-    <script src="js/store.js?v=23"></script>
-    <script src="js/poimport.js?v=23"></script>
-    <script src="js/app.js?v=23"></script>
-    <script src="js/proposal-pdf.js?v=23"></script>
-    <script src="js/excel.js?v=23"></script>
+    <script src="js/data.js?v=24"></script>
+    <script src="js/store.js?v=24"></script>
+    <script src="js/poimport.js?v=24"></script>
+    <script src="js/app.js?v=24"></script>
+    <script src="js/proposal-pdf.js?v=24"></script>
+    <script src="js/excel.js?v=24"></script>
   </body>
 </html>
