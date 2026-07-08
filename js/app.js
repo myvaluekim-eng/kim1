@@ -279,6 +279,7 @@ function renderSalesChannelDetail(channelId, summary, monthLabel) {
               </div>
               <div class="history-actions no-print">
                 <button class="btn btn-secondary btn-sm" data-view-proposal="${p.id}">보기</button>
+                <button class="btn btn-secondary btn-sm" data-pdf-id="${p.id}">📄 PDF</button>
                 <button class="btn btn-primary btn-sm" data-excel-id="${p.id}">📥 엑셀</button>
                 <button class="btn btn-danger btn-sm" data-delete-proposal="${p.id}">삭제</button>
               </div>
@@ -417,6 +418,21 @@ function setupGlobalDeleteHandlers() {
   content.dataset.deleteBound = "1";
 
   content.addEventListener("click", async (e) => {
+    const pdfBtn = e.target.closest("[data-pdf-id]");
+    if (pdfBtn) {
+      const proposal = getProposalById(appData, pdfBtn.dataset.pdfId);
+      if (proposal) {
+        showToast("PDF 생성 중...");
+        exportProposalToPdf(proposal)
+          .then(() => showToast("PDF 저장 완료"))
+          .catch((err) => {
+            console.error(err);
+            showToast("PDF 생성에 실패했습니다");
+          });
+      }
+      return;
+    }
+
     const excelBtn = e.target.closest("[data-excel-id]");
     if (excelBtn) {
       const proposal = getProposalById(appData, excelBtn.dataset.excelId);
@@ -827,6 +843,7 @@ function renderProposal() {
             : ""
         }
         <div class="proposal-meta-actions">
+          <button type="button" class="btn btn-secondary" id="btn-pdf-proposal">📄 PDF 저장</button>
           <button type="button" class="btn btn-secondary" id="btn-print">🖨 인쇄</button>
           <button type="button" class="btn btn-success" id="btn-save">💾 저장하기</button>
         </div>
@@ -984,17 +1001,7 @@ function bindProposalEvents() {
         proposalState.fobRate,
         proposalState.exchangeRate
       );
-      return {
-        productCode: p.code,
-        nameKor: p.nameKor,
-        srpKrw: item.srpKrw,
-        srpUsd: item.srpUsd,
-        fobRate: proposalState.fobRate,
-        fobUsd,
-        fobKrw,
-        poQty: item.poQty,
-        amount: calcAmount(fobUsd, fobKrw, item.poQty, channel),
-      };
+      return buildProposalItemSnapshot(p, item, proposalState, channel, fobUsd, fobKrw);
     });
     const totalAmount = items.reduce((s, i) => s + i.amount, 0);
     const version = saveProposal(appData, {
@@ -1012,6 +1019,44 @@ function bindProposalEvents() {
   });
 
   document.getElementById("btn-print").addEventListener("click", () => window.print());
+
+  document.getElementById("btn-pdf-proposal")?.addEventListener("click", async () => {
+    if (!proposalState.clientName.trim()) {
+      showToast("업체를 선택한 뒤 PDF를 저장하세요");
+      return;
+    }
+    try {
+      showToast("PDF 생성 중...");
+      const products = getProducts(appData);
+      const terms = getChannelTerms(appData, proposalState.channelId);
+      const items = products.map((p) => {
+        const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+        const { fobUsd, fobKrw } = calcFobFromSrp(
+          item.srpKrw,
+          item.srpUsd,
+          proposalState.fobRate,
+          proposalState.exchangeRate
+        );
+        return buildProposalItemSnapshot(p, item, proposalState, channel, fobUsd, fobKrw);
+      });
+      const draftProposal = {
+        channelId: proposalState.channelId,
+        clientName: proposalState.clientName,
+        poDate: proposalState.poDate,
+        fobRate: proposalState.fobRate,
+        exchangeRate: proposalState.exchangeRate,
+        version: "draft",
+        items,
+        totalAmount: items.reduce((s, i) => s + i.amount, 0),
+        terms,
+      };
+      await exportProposalToPdf(draftProposal);
+      showToast("PDF 저장 완료");
+    } catch (err) {
+      console.error(err);
+      showToast("PDF 생성에 실패했습니다");
+    }
+  });
 }
 
 function updateProposalCalcs(channel) {
@@ -2479,6 +2524,7 @@ function renderHistory() {
             </div>
             <div class="history-actions no-print">
               <button class="btn btn-secondary btn-sm" data-view-id="${p.id}">보기</button>
+              <button class="btn btn-secondary btn-sm" data-pdf-id="${p.id}">📄 PDF</button>
               <button class="btn btn-primary btn-sm" data-excel-id="${p.id}">📥 엑셀</button>
               <button class="btn btn-danger btn-sm" data-delete-proposal="${p.id}">삭제</button>
             </div>
@@ -2505,62 +2551,17 @@ function bindHistoryEvents() {
       const ch = getChannelList().find((c) => c.id === proposal.channelId);
       const detail = document.getElementById("history-detail");
       detail.innerHTML = `
-        <div class="card" style="margin-top:20px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
-            <div class="card-title" style="margin:0">v${proposal.version} — ${proposal.clientName} (${ch.name}) · ${proposal.poDate}</div>
-            <div class="no-print" style="display:flex;gap:8px">
+        <div class="card proposal-history-detail" style="margin-top:20px">
+          <div class="proposal-history-detail-header no-print">
+            <div class="card-title" style="margin:0">v${proposal.version} — ${proposal.clientName} (${ch?.name || proposal.channelId}) · ${proposal.poDate}</div>
+            <div class="proposal-history-detail-actions">
+              <button class="btn btn-secondary" data-pdf-id="${proposal.id}">📄 PDF 저장</button>
               <button class="btn btn-primary" data-excel-id="${proposal.id}">📥 엑셀 다운로드</button>
               <button class="btn btn-danger" data-delete-proposal="${proposal.id}">삭제</button>
             </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>제품코드</th>
-                  <th>제품명</th>
-                  <th>SRP (₩)</th>
-                  <th>SRP ($)</th>
-                  <th>FOB%</th>
-                  <th>FOB (₩)</th>
-                  <th>FOB ($)</th>
-                  <th>P.O Qty</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${proposal.items
-                  .map((item) => {
-                    const srpKrw = item.srpKrw ?? item.srp;
-                    const srpUsd = item.srpUsd ?? (ch.currency === "USD" ? item.srp : null);
-                    const fobKrw = item.fobKrw ?? null;
-                    const fobUsd = item.fobUsd ?? null;
-                    return `
-                  <tr>
-                    <td><code>${item.productCode}</code></td>
-                    <td>${item.nameKor}</td>
-                    <td>${formatKrw(srpKrw)}</td>
-                    <td>${formatUsd(srpUsd)}</td>
-                    <td>${item.fobRate}%</td>
-                    <td>${formatKrw(fobKrw)}</td>
-                    <td>${formatUsd(fobUsd)}</td>
-                    <td>${item.poQty}</td>
-                    <td>${formatMoney(item.amount, ch)}</td>
-                  </tr>`;
-                  })
-                  .join("")}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colspan="8" style="text-align:right;font-weight:700">Total</td>
-                  <td class="total-row">${formatMoney(proposal.totalAmount, ch)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          <div class="terms-box" style="margin-top:16px">
-            <h4>Terms & Conditions</h4>
-            ${proposal.terms.map((t) => `<p>${t}</p>`).join("")}
+          <div class="proposal-doc-preview">
+            ${buildProposalDocumentHtml(proposal)}
           </div>
         </div>
       `;
