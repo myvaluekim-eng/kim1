@@ -169,30 +169,22 @@ function buildProposalDocumentHtml(proposal) {
         <td class="num">${item.poQty || 0}</td>
         <td class="num">${formatNumber(item.ctn, 2)}</td>
         <td class="num">${formatNumber(item.cbmQty, 4)}</td>
-        <td class="num strong">${formatMoney(item.amount, channel)}</td>
+        <td class="num">${formatMoney(item.amount, channel)}</td>
       </tr>`
     )
     .join("");
 
   return `
-    <div class="proposal-doc">
-      <header class="proposal-doc-header">
-        <div class="proposal-doc-brand">Barle</div>
-        <div class="proposal-doc-heading">
-          <h1>PRODUCT &amp; PRICE LIST</h1>
-          <p>Barle Cosmetics · ${channel?.name || proposal.channelId}</p>
-        </div>
-        <div class="proposal-doc-meta-badge">v${proposal.version}</div>
-      </header>
+    <div class="proposal-doc proposal-doc--plain">
+      <div class="proposal-doc-title">
+        <h1>PRODUCT &amp; PRICE LIST</h1>
+        <p>Barle Cosmetics</p>
+      </div>
 
-      <section class="proposal-doc-meta">
-        <div><span>Buyer</span><strong>${proposal.clientName}</strong></div>
-        <div><span>Date</span><strong>${proposal.poDate || "—"}</strong></div>
-        <div><span>Market</span><strong>${channel?.name || "—"}</strong></div>
-        <div><span>FOB Rate</span><strong>${proposal.fobRate}%</strong></div>
-        <div><span>Exchange</span><strong>1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")}</strong></div>
-        <div><span>Total Amount</span><strong>${formatMoney(totals.totalAmount, channel)}</strong></div>
-      </section>
+      <div class="proposal-doc-info">
+        <p>Buyer: ${proposal.clientName} &nbsp;|&nbsp; Date: ${proposal.poDate || "—"} &nbsp;|&nbsp; Market: ${channel?.name || "—"} &nbsp;|&nbsp; Ver. ${proposal.version}</p>
+        <p>FOB ${proposal.fobRate}% &nbsp;|&nbsp; Exchange 1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")} &nbsp;|&nbsp; Total: ${formatMoney(totals.totalAmount, channel)}</p>
+      </div>
 
       <table class="proposal-doc-table">
         <thead>
@@ -216,9 +208,9 @@ function buildProposalDocumentHtml(proposal) {
         <tfoot>
           <tr>
             <td colspan="10" class="total-label">TOTAL</td>
-            <td class="num strong">${formatNumber(totals.totalCtn, 2)}</td>
-            <td class="num strong">${formatNumber(totals.totalCbm, 4)}</td>
-            <td class="num strong">${formatMoney(totals.totalAmount, channel)}</td>
+            <td class="num">${formatNumber(totals.totalCtn, 2)}</td>
+            <td class="num">${formatNumber(totals.totalCbm, 4)}</td>
+            <td class="num">${formatMoney(totals.totalAmount, channel)}</td>
           </tr>
         </tfoot>
       </table>
@@ -226,18 +218,14 @@ function buildProposalDocumentHtml(proposal) {
       ${
         terms.length
           ? `
-      <section class="proposal-doc-terms">
-        <h2>Terms &amp; Conditions</h2>
+      <div class="proposal-doc-terms">
+        <p class="proposal-doc-terms-title">Terms &amp; Conditions</p>
         ${terms.map((t) => `<p>${t}</p>`).join("")}
-      </section>`
+      </div>`
           : ""
       }
 
-      <footer class="proposal-doc-footer">
-        <span>Barle Cosmetics</span>
-        <span>barle.co.kr</span>
-        <span>Generated ${new Date().toLocaleDateString("ko-KR")}</span>
-      </footer>
+      <p class="proposal-doc-footer">Barle Cosmetics · barle.co.kr</p>
     </div>
   `;
 }
@@ -269,6 +257,7 @@ async function exportProposalToPdf(proposal) {
           useCORS: true,
           letterRendering: true,
           logging: false,
+          backgroundColor: "#ffffff",
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
         pagebreak: { mode: ["css", "legacy"], avoid: ".proposal-doc-terms" },
