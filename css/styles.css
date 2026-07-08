@@ -1335,12 +1335,6 @@ td.total-row {
   color: var(--primary);
 }
 
-.highlight-value small {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
 .highlight-totals {
   margin-top: 12px;
   padding-top: 12px;
@@ -1350,6 +1344,11 @@ td.total-row {
   line-height: 1.6;
   text-align: right;
 }
+
+.highlight-value small {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-muted);
   margin-left: 4px;
 }
 
