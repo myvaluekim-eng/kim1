@@ -37,10 +37,24 @@ function migrateChannels(data) {
   });
 }
 
+function migrateProducts(data) {
+  const defaults = Object.fromEntries(DEFAULT_PRODUCTS.map((p) => [p.code, p]));
+  const products = data.products?.length ? data.products : structuredClone(DEFAULT_PRODUCTS);
+  data.products = products.map((p) => {
+    const def = defaults[p.code];
+    const migrated = { ...p };
+    delete migrated.salesRank;
+    if (def) {
+      if (migrated.srpUsd == null) migrated.srpUsd = def.srpUsd ?? null;
+      if (migrated.fobUsd == null) migrated.fobUsd = def.fobUsd ?? null;
+      if (migrated.fobRate == null) migrated.fobRate = def.fobRate ?? null;
+    }
+    return migrated;
+  });
+}
+
 function migrateData(data) {
-  if (!data.products || data.products.length === 0) {
-    data.products = structuredClone(DEFAULT_PRODUCTS);
-  }
+  migrateProducts(data);
   migrateChannels(data);
   if (!data.channelSrp) data.channelSrp = structuredClone(DEFAULT_SRP);
   getProducts(data).forEach((p) => {
@@ -107,6 +121,14 @@ function addProduct(data, product) {
   }
   data.products = [...products, product];
   initChannelSrpForProduct(data, product.code);
+  if (product.srpUsd != null) {
+    getChannels(data).forEach((ch) => {
+      const entry = data.channelSrp[product.code][ch.id];
+      if (entry && entry.usd == null) {
+        entry.usd = product.srpUsd;
+      }
+    });
+  }
   saveData(data);
   return { ok: true };
 }

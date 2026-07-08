@@ -138,8 +138,8 @@ function initProposalState(channelId) {
   getProducts(appData).forEach((p) => {
     const srp = getChannelSrp(appData, p.code, channel.id);
     proposalState.items[p.code] = {
-      srpKrw: srp.krw,
-      srpUsd: srp.usd,
+      srpKrw: srp.krw ?? p.srpKrw ?? null,
+      srpUsd: srp.usd ?? p.srpUsd ?? null,
       poQty: 0,
     };
   });
@@ -1684,8 +1684,16 @@ function renderProducts() {
             <input type="number" name="shelfLife" value="24" min="1">
           </div>
           <div class="form-group">
-            <label>판매순위</label>
-            <input type="number" name="salesRank" value="1" min="1">
+            <label>권장 소비자가 ($)</label>
+            <input type="number" name="srpUsd" step="0.01" min="0" placeholder="29.59">
+          </div>
+          <div class="form-group">
+            <label>공급가 FOB ($)</label>
+            <input type="number" name="fobUsd" step="0.0001" min="0" placeholder="8.5811">
+          </div>
+          <div class="form-group">
+            <label>공급가율 (%)</label>
+            <input type="number" name="fobRate" value="29" min="1" max="100" step="0.1">
           </div>
           <div class="form-group">
             <label>MOQ (CTN)</label>
@@ -1712,7 +1720,8 @@ function renderProducts() {
               <th>박스입수량</th>
               <th>CBM</th>
               <th>유통기한</th>
-              <th>판매순위</th>
+              <th>권장 소비자가($)</th>
+              <th>공급가 FOB($)</th>
               <th>MOQ</th>
               <th class="no-print"></th>
             </tr>
@@ -1731,7 +1740,8 @@ function renderProducts() {
                 <td>${p.cartonQty}</td>
                 <td>${p.cbm}</td>
                 <td>${p.shelfLife}개월</td>
-                <td>${p.salesRank}</td>
+                <td>${p.srpUsd != null ? formatUsd(p.srpUsd) : "—"}</td>
+                <td>${p.fobUsd != null ? formatUsd(p.fobUsd) : "—"}</td>
                 <td>${p.moq}</td>
                 <td class="no-print">
                   <button class="btn btn-danger btn-sm" data-delete-code="${p.code}">삭제</button>
@@ -1763,7 +1773,11 @@ function bindProductEvents() {
         cartonSize: fd.get("cartonSize").trim() || "",
         cbm: Number(fd.get("cbm")) || 0,
         shelfLife: Number(fd.get("shelfLife")) || 24,
-        salesRank: Number(fd.get("salesRank")) || 1,
+        srpUsd: parseOptionalNumber(fd.get("srpUsd")),
+        fobUsd: parseOptionalNumber(fd.get("fobUsd")),
+        fobRate: parseOptionalNumber(fd.get("fobRate")) != null
+          ? parseOptionalNumber(fd.get("fobRate")) / 100
+          : null,
         moq: Number(fd.get("moq")) || 50,
       };
       const result = addProduct(appData, product);
