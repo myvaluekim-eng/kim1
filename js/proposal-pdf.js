@@ -283,7 +283,7 @@ async function exportProposalToPdf(proposal) {
   try {
     await html2pdf()
       .set({
-        margin: [8, 8, 8, 8],
+        margin: [4, 6, 6, 6],
         filename: getProposalPdfFilename(proposal),
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {

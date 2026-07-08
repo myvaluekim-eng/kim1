@@ -1654,11 +1654,18 @@ td.total-row {
 /* ── Proposal document (history preview & PDF) ── */
 .proposal-pdf-root {
   position: fixed;
-  left: -9999px;
+  left: 0;
   top: 0;
+  z-index: -1;
   width: 1123px;
   pointer-events: none;
   opacity: 0;
+  overflow: hidden;
+}
+
+.proposal-pdf-root .proposal-doc {
+  padding: 4px 16px 12px;
+  min-width: 0;
 }
 
 .proposal-doc-preview {
@@ -1721,7 +1728,7 @@ td.total-row {
   font-size: 16px;
   font-weight: 700;
   text-align: center;
-  padding: 10px 6px 6px;
+  padding: 4px 6px 4px;
   border-bottom: none;
 }
 
