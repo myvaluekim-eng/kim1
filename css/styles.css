@@ -740,6 +740,91 @@ body {
   color: var(--primary-dark, #047857);
 }
 
+.po-manual-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.po-product-picker {
+  flex: 1;
+}
+
+.po-picker-label {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.po-product-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.po-product-chip {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.po-product-chip:hover {
+  border-color: var(--primary);
+}
+
+.po-product-chip.selected {
+  border-color: var(--primary);
+  background: var(--primary-light, #ecfdf5);
+  color: var(--primary-dark, #047857);
+  font-weight: 600;
+}
+
+.po-currency-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.po-currency-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.po-currency-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.po-currency-btn:hover {
+  border-color: var(--primary);
+}
+
+.po-currency-btn.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.po-row-code {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
 .po-status {
   margin-top: 12px;
   padding: 10px 14px;

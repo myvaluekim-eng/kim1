@@ -28,7 +28,9 @@ function freshPoUploadState() {
     fileKind: "",
     mode: "file",
     rows: [],
+    manualSelected: [],
     manualItems: {},
+    manualPriceCurrency: "USD",
     status: "idle",
     statusMsg: "",
     warning: "",
@@ -975,92 +977,154 @@ function renderPoRow(r, i) {
   `;
 }
 
-function initPoManualItems(channelId) {
-  const channel = findChannel(channelId);
-  const items = {};
-  getProducts(appData).forEach((p) => {
-    const srp = getChannelSrp(appData, p.code, channelId);
-    const unitPrice = channel.currency === "KRW" ? srp.krw : srp.usd;
-    items[p.code] = { qty: 0, unitPrice: unitPrice ?? null, amount: 0 };
-  });
-  return items;
+function getPoManualExchangeRate() {
+  return appData.exchangeRate || DEFAULT_EXCHANGE_RATE;
 }
 
-function updatePoManualCalcs(channel) {
+function formatPoManualMoney(amount) {
+  return poUploadState.manualPriceCurrency === "KRW" ? formatKrw(amount) : formatUsd(amount);
+}
+
+function createPoManualItem(code) {
+  const srp = getChannelSrp(appData, code, poUploadState.channelId);
+  const currency = poUploadState.manualPriceCurrency;
+  const unitPrice = currency === "KRW" ? srp.krw : srp.usd;
+  return { qty: 0, unitPrice: unitPrice ?? null, amount: 0 };
+}
+
+function addPoManualProduct(code) {
+  if (!poUploadState.manualSelected.includes(code)) {
+    poUploadState.manualSelected.push(code);
+  }
+  if (!poUploadState.manualItems[code]) {
+    poUploadState.manualItems[code] = createPoManualItem(code);
+  }
+}
+
+function removePoManualProduct(code) {
+  poUploadState.manualSelected = poUploadState.manualSelected.filter((c) => c !== code);
+  delete poUploadState.manualItems[code];
+}
+
+function switchPoManualCurrency(currency) {
+  if (poUploadState.manualPriceCurrency === currency) return;
+  const rate = getPoManualExchangeRate();
+  const from = poUploadState.manualPriceCurrency;
+  poUploadState.manualSelected.forEach((code) => {
+    const item = poUploadState.manualItems[code];
+    if (!item || item.unitPrice == null) return;
+    if (from === "USD" && currency === "KRW") {
+      item.unitPrice = Math.round(item.unitPrice * rate);
+    } else if (from === "KRW" && currency === "USD") {
+      item.unitPrice = Math.round((item.unitPrice / rate) * 100) / 100;
+    }
+    const qty = item.qty || 0;
+    item.amount = qty > 0 && item.unitPrice != null ? qty * item.unitPrice : 0;
+  });
+  poUploadState.manualPriceCurrency = currency;
+}
+
+function updatePoManualCalcs() {
   let totalAmount = 0;
-  getProducts(appData).forEach((p) => {
-    const item = poUploadState.manualItems[p.code] || { qty: 0, unitPrice: null, amount: 0 };
+  poUploadState.manualSelected.forEach((code) => {
+    const item = poUploadState.manualItems[code] || { qty: 0, unitPrice: null, amount: 0 };
     const qty = item.qty || 0;
     const unitPrice = item.unitPrice;
-    const amount = unitPrice != null && qty > 0 ? qty * unitPrice : item.amount || 0;
+    const amount = unitPrice != null && qty > 0 ? qty * unitPrice : 0;
     item.amount = amount;
-    poUploadState.manualItems[p.code] = item;
-    if (qty > 0 || amount > 0) totalAmount += amount;
+    poUploadState.manualItems[code] = item;
+    if (qty > 0) totalAmount += amount;
 
-    const amountEl = document.querySelector(`[data-po-manual-amount="${p.code}"]`);
-    if (amountEl) amountEl.textContent = formatMoney(amount, channel);
+    const amountEl = document.querySelector(`[data-po-manual-amount="${code}"]`);
+    if (amountEl) amountEl.textContent = formatPoManualMoney(amount);
   });
   const totalEl = document.getElementById("po-manual-total-amount");
-  if (totalEl) totalEl.textContent = formatMoney(totalAmount, channel);
+  if (totalEl) totalEl.textContent = formatPoManualMoney(totalAmount);
 }
 
 function renderPoManualSection(channel) {
   const products = getProducts(appData);
-  if (!Object.keys(poUploadState.manualItems).length) {
-    poUploadState.manualItems = initPoManualItems(poUploadState.channelId);
-  }
+  const currency = poUploadState.manualPriceCurrency;
+  const unitLabel = currency === "KRW" ? "단가 (₩)" : "단가 ($)";
 
   let totalAmount = 0;
-  const rows = products
-    .map((p) => {
-      const item = poUploadState.manualItems[p.code] || { qty: 0, unitPrice: null, amount: 0 };
+  const selectedRows = poUploadState.manualSelected
+    .map((code) => {
+      const p = products.find((x) => x.code === code);
+      if (!p) return "";
+      const item = poUploadState.manualItems[code] || { qty: 0, unitPrice: null, amount: 0 };
       const qty = item.qty || 0;
       const unitPrice = item.unitPrice;
-      const amount = unitPrice != null && qty > 0 ? qty * unitPrice : item.amount || 0;
-      if (qty > 0 || amount > 0) totalAmount += amount;
+      const amount = unitPrice != null && qty > 0 ? qty * unitPrice : 0;
+      if (qty > 0) totalAmount += amount;
       return `
       <tr data-po-manual-code="${p.code}">
-        <td>${p.category}</td>
-        <td><strong>${p.nameKor}</strong></td>
-        <td><code>${p.code}</code></td>
+        <td><strong>${p.nameKor}</strong> <code class="po-row-code">${p.code}</code></td>
         <td class="editable">
           <input class="input-cell qty" type="number" step="1" min="0"
             data-po-manual-field="qty" data-code="${p.code}" value="${qty || ""}" placeholder="0">
         </td>
         <td class="editable">
-          <input class="input-cell" type="number" step="1" min="0"
+          <input class="input-cell" type="number" step="${currency === "USD" ? "0.01" : "1"}" min="0"
             data-po-manual-field="unitPrice" data-code="${p.code}" value="${unitPrice ?? ""}" placeholder="0">
         </td>
-        <td class="auto" data-po-manual-amount="${p.code}">${formatMoney(amount, channel)}</td>
+        <td class="auto" data-po-manual-amount="${p.code}">${formatPoManualMoney(amount)}</td>
+        <td class="no-print">
+          <button type="button" class="btn btn-danger btn-sm" data-po-manual-remove="${p.code}">삭제</button>
+        </td>
       </tr>`;
+    })
+    .join("");
+
+  const productChips = products
+    .map((p) => {
+      const selected = poUploadState.manualSelected.includes(p.code);
+      return `
+      <button type="button" class="po-product-chip${selected ? " selected" : ""}" data-po-pick-product="${p.code}">
+        ${selected ? "✓ " : ""}${p.nameKor}
+      </button>`;
     })
     .join("");
 
   return `
     <div class="section-block">
-      <div class="section-label">③ 제품별 발주 수기 입력</div>
-      <p class="card-desc no-print">단가표 만들기처럼 제품 목록에서 발주수량·단가를 입력하세요. 금액은 자동 계산됩니다.</p>
-      <div class="legend-bar no-print">
-        <span class="legend-item"><span class="legend-swatch editable"></span> 직접 입력</span>
-        <span class="legend-item"><span class="legend-swatch auto"></span> 자동 계산</span>
+      <div class="section-label">③ 발주 품목 선택 · 입력</div>
+
+      <div class="po-manual-toolbar no-print">
+        <div class="po-product-picker">
+          <p class="po-picker-label">제품 클릭하여 추가</p>
+          <div class="po-product-chips">${productChips}</div>
+        </div>
+        <div class="po-currency-toggle">
+          <span class="po-currency-label">단가 통화</span>
+          <button type="button" class="po-currency-btn${currency === "KRW" ? " active" : ""}" data-po-currency="KRW">₩ 원화</button>
+          <button type="button" class="po-currency-btn${currency === "USD" ? " active" : ""}" data-po-currency="USD">$ 달러</button>
+        </div>
       </div>
+
       <div class="table-wrap">
         <table class="po-manual-table">
           <thead>
             <tr>
-              <th>분류</th>
               <th>제품명</th>
-              <th>제품코드</th>
-              <th class="col-editable">발주수량</th>
-              <th class="col-editable">단가</th>
-              <th class="col-auto">금액</th>
+              <th>발주수량</th>
+              <th>${unitLabel}</th>
+              <th>금액</th>
+              <th class="no-print"></th>
             </tr>
           </thead>
-          <tbody>${rows}</tbody>
+          <tbody>
+            ${
+              poUploadState.manualSelected.length
+                ? selectedRows
+                : `<tr><td colspan="5" class="po-empty-hint">위에서 발주할 제품을 클릭해 추가하세요</td></tr>`
+            }
+          </tbody>
           <tfoot>
             <tr>
-              <td colspan="5" style="text-align:right;font-weight:700">합계</td>
-              <td class="total-row" id="po-manual-total-amount">${formatMoney(totalAmount, channel)}</td>
+              <td colspan="3" style="text-align:right;font-weight:700">합계</td>
+              <td class="total-row" id="po-manual-total-amount">${formatPoManualMoney(totalAmount)}</td>
+              <td></td>
             </tr>
           </tfoot>
         </table>
@@ -1242,18 +1306,21 @@ function savePoUpload() {
   let source = "po-upload";
 
   if (poUploadState.mode === "manual") {
-    items = products
-      .map((p) => {
-        const item = poUploadState.manualItems[p.code] || { qty: 0, unitPrice: null, amount: 0 };
+    const currency = poUploadState.manualPriceCurrency;
+    items = poUploadState.manualSelected
+      .map((code) => {
+        const p = products.find((x) => x.code === code);
+        if (!p) return null;
+        const item = poUploadState.manualItems[code] || { qty: 0, unitPrice: null, amount: 0 };
         const qty = item.qty || 0;
         const unitPrice = item.unitPrice;
-        const amount = unitPrice != null && qty > 0 ? qty * unitPrice : item.amount || 0;
-        if (qty <= 0 && amount <= 0) return null;
+        const amount = unitPrice != null && qty > 0 ? qty * unitPrice : 0;
+        if (qty <= 0) return null;
         return {
           productCode: p.code,
           nameKor: p.nameKor,
-          srpKrw: channel.currency === "KRW" ? unitPrice : null,
-          srpUsd: channel.currency === "USD" ? unitPrice : null,
+          srpKrw: currency === "KRW" ? unitPrice : null,
+          srpUsd: currency === "USD" ? unitPrice : null,
           fobRate: 0,
           fobUsd: null,
           fobKrw: null,
@@ -1264,7 +1331,7 @@ function savePoUpload() {
       .filter(Boolean);
     source = "po-manual";
     if (!items.length) {
-      showToast("발주수량 또는 금액이 입력된 제품이 없습니다");
+      showToast("발주수량이 입력된 제품이 없습니다");
       return;
     }
   } else {
@@ -1331,18 +1398,41 @@ function bindPoUploadEvents() {
     poUploadState.channelId = e.target.value;
     poUploadState.clientName = "";
     if (poUploadState.mode === "manual") {
-      poUploadState.manualItems = initPoManualItems(poUploadState.channelId);
+      poUploadState.manualSelected = [];
+      poUploadState.manualItems = {};
     }
     render();
   });
 
   document.querySelectorAll("[data-po-mode]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const mode = btn.dataset.poMode;
-      poUploadState.mode = mode;
-      if (mode === "manual" && !Object.keys(poUploadState.manualItems).length) {
-        poUploadState.manualItems = initPoManualItems(poUploadState.channelId);
+      poUploadState.mode = btn.dataset.poMode;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-po-pick-product]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const code = btn.dataset.poPickProduct;
+      if (poUploadState.manualSelected.includes(code)) {
+        removePoManualProduct(code);
+      } else {
+        addPoManualProduct(code);
       }
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-po-manual-remove]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      removePoManualProduct(btn.dataset.poManualRemove);
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-po-currency]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      switchPoManualCurrency(btn.dataset.poCurrency);
       render();
     });
   });
@@ -1352,11 +1442,11 @@ function bindPoUploadEvents() {
       const code = e.target.dataset.code;
       const field = e.target.dataset.poManualField;
       if (!poUploadState.manualItems[code]) {
-        poUploadState.manualItems[code] = { qty: 0, unitPrice: null, amount: 0 };
+        poUploadState.manualItems[code] = createPoManualItem(code);
       }
       poUploadState.manualItems[code][field] =
         field === "qty" ? parseFloat(e.target.value) || 0 : parseOptionalNumber(e.target.value);
-      updatePoManualCalcs(findChannel(poUploadState.channelId));
+      updatePoManualCalcs();
     });
   });
 
