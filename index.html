@@ -6,10 +6,12 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>바를 영업 관리</title>
+    <title>Barle · 영업 관리</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <script>
       (function () {
-        window.APP_BUILD = "2026-07-09-v20";
+        window.APP_BUILD = "2026-07-09-v21";
         var key = "barle-app-build";
         var saved = localStorage.getItem(key);
         if (saved !== window.APP_BUILD) {
@@ -35,87 +37,94 @@
         });
       })();
     </script>
-    <link rel="stylesheet" href="css/styles.css?v=20" />
+    <link rel="stylesheet" href="css/styles.css?v=21" />
   </head>
   <body>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-logo">
-        <div class="logo-mark">B</div>
+        <div class="logo-mark">Barle</div>
         <div>
-          <h1>바를 영업관리</h1>
-          <span>Barle Cosmetics</span>
+          <h1>영업 관리</h1>
+          <span>barle.co.kr</span>
         </div>
       </div>
 
       <nav class="sidebar-nav">
-        <div class="nav-section">
-          <p class="nav-section-label">자주 쓰는 메뉴</p>
-          <button class="nav-item active" data-view="dashboard">
-            <span class="nav-icon">🏠</span>
-            <span class="nav-text">
-              <strong>시작하기</strong>
-              <small>업무 선택 및 안내</small>
-            </span>
-          </button>
-          <button class="nav-item" data-view="proposal">
+        <div class="nav-section nav-section-main">
+          <p class="nav-section-label">메인 업무</p>
+          <button class="nav-item nav-item-main" data-view="proposal">
             <span class="nav-icon">📋</span>
             <span class="nav-text">
               <strong>단가표 만들기</strong>
-              <small>업체에 보낼 가격표 작성</small>
+              <small>바이어용 가격표 · 견적</small>
             </span>
           </button>
-          <button class="nav-item" data-view="poupload">
+          <button class="nav-item nav-item-main" data-view="poupload">
             <span class="nav-icon">🧾</span>
             <span class="nav-text">
               <strong>발주서 등록</strong>
-              <small>발주서 파일·이미지 업로드</small>
+              <small>수기·파일 업로드 → 매출 반영</small>
             </span>
           </button>
+        </div>
+
+        <div class="nav-section nav-section-sub">
+          <p class="nav-section-label">업무 조회</p>
           <button class="nav-item" data-view="history">
             <span class="nav-icon">🕐</span>
             <span class="nav-text">
               <strong>지난 단가표</strong>
-              <small>저장된 가격표 다시 보기</small>
+              <small>저장된 견적 이력</small>
             </span>
           </button>
           <button class="nav-item" data-view="sales">
             <span class="nav-icon">📈</span>
             <span class="nav-text">
               <strong>영업 현황</strong>
-              <small>업체별·월별 발주 한눈에</small>
+              <small>월별 발주 · 매출</small>
             </span>
           </button>
         </div>
 
-        <div class="nav-section">
-          <p class="nav-section-label">데이터 관리</p>
-          <button class="nav-item" data-view="products">
-            <span class="nav-icon">📦</span>
-            <span class="nav-text">
-              <strong>제품 등록</strong>
-              <small>신규 제품 추가·삭제</small>
-            </span>
-          </button>
-          <button class="nav-item" data-view="master" type="button" onclick="setView('master')">
-            <span class="nav-icon">🌐</span>
-            <span class="nav-text">
-              <strong>거래처 통합 등록</strong>
-              <small>국가·업체·거래조건 한번에</small>
-            </span>
-          </button>
-          <button class="nav-item" data-view="srp">
-            <span class="nav-icon">💰</span>
-            <span class="nav-text">
-              <strong>소비자가 설정</strong>
-              <small>국가별 권장 소비자가</small>
-            </span>
-          </button>
+        <div class="nav-section nav-section-data">
+          <p class="nav-section-label">데이터 등록</p>
+          <p class="nav-section-hint">메인 업무 전에 한 번만 설정하면 됩니다</p>
+          <div class="nav-data-panel">
+            <button class="nav-item nav-item-data" data-view="products">
+              <span class="nav-icon">📦</span>
+              <span class="nav-text">
+                <strong>제품 등록</strong>
+                <small>품목 · 가격 정보</small>
+              </span>
+            </button>
+            <button class="nav-item nav-item-data" data-view="master" type="button" onclick="setView('master')">
+              <span class="nav-icon">🌐</span>
+              <span class="nav-text">
+                <strong>거래처 통합 등록</strong>
+                <small>국가 · 업체 · 거래조건</small>
+              </span>
+            </button>
+            <button class="nav-item nav-item-data" data-view="srp">
+              <span class="nav-icon">💰</span>
+              <span class="nav-text">
+                <strong>소비자가 설정</strong>
+                <small>국가별 권장가 (선택)</small>
+              </span>
+            </button>
+            <button class="nav-item nav-item-data" data-view="dashboard">
+              <span class="nav-icon">🏠</span>
+              <span class="nav-text">
+                <strong>시작하기</strong>
+                <small>안내 · 바로가기</small>
+              </span>
+            </button>
+          </div>
         </div>
       </nav>
 
       <div class="sidebar-help">
-        <p><strong>💡 도움말</strong></p>
-        <p>노란 칸은 직접 입력, 파란 칸은 자동 계산됩니다.</p>
+        <p><strong>입력 안내</strong></p>
+        <p>노란 칸은 직접 입력, 연두 칸은 자동 계산됩니다.</p>
         <p class="app-version" id="app-version-label">버전 확인 중…</p>
       </div>
     </aside>
@@ -128,7 +137,7 @@
           <button class="menu-toggle no-print" id="menu-toggle" aria-label="메뉴 열기">☰</button>
           <div>
             <h2 id="page-title">시작하기</h2>
-            <p id="page-desc">업무를 선택하세요.</p>
+            <p id="page-desc">Barle 영업 관리 홈입니다.</p>
           </div>
         </div>
         <span class="topbar-brand no-print">Barle Cosmetics</span>
@@ -192,10 +201,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-    <script src="js/data.js?v=20"></script>
-    <script src="js/store.js?v=20"></script>
-    <script src="js/excel.js?v=20"></script>
-    <script src="js/poimport.js?v=20"></script>
-    <script src="js/app.js?v=20"></script>
+    <script src="js/data.js?v=21"></script>
+    <script src="js/store.js?v=21"></script>
+    <script src="js/excel.js?v=21"></script>
+    <script src="js/poimport.js?v=21"></script>
+    <script src="js/app.js?v=21"></script>
   </body>
 </html>

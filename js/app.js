@@ -445,17 +445,17 @@ function setupGlobalDeleteHandlers() {
 }
 
 const PAGE_META = {
-  dashboard: { title: "시작하기", desc: "무엇을 하실지 선택하세요. 처음이시면 아래 순서를 따라하시면 됩니다." },
-  proposal: { title: "단가표 만들기", desc: "바이어에게 전달할 가격표를 작성합니다. 매출 발생 전 견적이며 영업 현황에는 포함되지 않습니다." },
-  poupload: { title: "발주서 등록", desc: "실제 발주를 파일 업로드 또는 수기 입력으로 등록합니다. 저장 시 영업 현황(매출)에 반영됩니다." },
-  products: { title: "제품 등록", desc: "새로 출시된 제품을 등록하거나 기존 제품을 관리합니다." },
+  dashboard: { title: "시작하기", desc: "Barle 영업 관리 홈입니다. 단가표·발주가 메인 업무이고, 데이터 등록은 처음 한 번만 설정하면 됩니다." },
+  proposal: { title: "단가표 만들기", desc: "바이어에게 보낼 견적 · 가격표를 작성합니다. 저장해도 매출에는 반영되지 않습니다." },
+  poupload: { title: "발주서 등록", desc: "수기 입력 또는 파일 업로드로 발주를 등록합니다. 저장 시 영업 현황에 반영됩니다." },
+  products: { title: "제품 등록", desc: "품목과 가격 정보를 등록합니다. 단가표·발주서 작성 전에 준비해 두세요." },
   master: {
     title: "거래처 통합 등록",
     desc: "판매국가, 거래 업체, 거래 조건을 한 화면에서 등록·수정합니다.",
   },
-  srp: { title: "소비자가 설정", desc: "국가별 권장 소비자가를 미리 입력해 두면 단가표에 자동으로 채워집니다." },
-  history: { title: "지난 단가표", desc: "바이어에게 보낸 단가표(견적) 이력만 모아 봅니다. 발주서는 영업 현황에서 확인합니다." },
-  sales: { title: "영업 현황", desc: "이번 달 업체별·국가별 발주 건수와 금액을 한눈에 확인합니다." },
+  srp: { title: "소비자가 설정", desc: "국가별 권장 소비자가를 입력해 두면 단가표 작성 시 자동으로 채워집니다. (선택)" },
+  history: { title: "지난 단가표", desc: "저장된 견적 · 가격표 이력을 확인합니다." },
+  sales: { title: "영업 현황", desc: "월별 발주 건수와 금액을 국가·업체별로 확인합니다." },
 };
 
 function setView(view) {
@@ -464,7 +464,7 @@ function setView(view) {
   document.querySelectorAll(".nav-item").forEach((el) => {
     el.classList.toggle("active", el.dataset.view === view);
   });
-  const meta = PAGE_META[view] || { title: "바를 영업관리", desc: "" };
+  const meta = PAGE_META[view] || { title: "Barle 영업 관리", desc: "" };
   document.getElementById("page-title").textContent = meta.title;
   document.getElementById("page-desc").textContent = meta.desc;
   document.getElementById("sidebar")?.classList.remove("open");
@@ -606,60 +606,71 @@ function renderDashboard() {
   const products = getProducts(appData);
   const channels = getChannelList();
   const totalQuotes = getQuotes(appData).length;
-  const byChannel = channels.map((ch) => ({
-    ...ch,
-    count: getQuotes(appData, ch.id).length,
-  }));
 
   return `
-    <div class="action-grid no-print">
-      <button class="action-card primary" onclick="setView('proposal')">
-        <div class="action-icon">📋</div>
-        <div class="action-title">단가표 만들기</div>
-        <div class="action-desc">바이어용 가격표 작성 (견적)</div>
-      </button>
-      <button class="action-card" onclick="setView('poupload')">
-        <div class="action-icon">🧾</div>
-        <div class="action-title">발주서 등록</div>
-        <div class="action-desc">실제 발주 등록 → 영업 현황 반영</div>
-      </button>
-      <button class="action-card" onclick="setView('history')">
-        <div class="action-icon">🕐</div>
-        <div class="action-title">지난 단가표 보기</div>
-        <div class="action-desc">이전에 저장한 가격표를 다시 확인합니다</div>
-      </button>
-      <button class="action-card" onclick="setView('products')">
-        <div class="action-icon">📦</div>
-        <div class="action-title">제품 등록</div>
-        <div class="action-desc">신규 제품을 추가합니다</div>
-      </button>
-      <button class="action-card" onclick="openMaster('')">
-        <div class="action-icon">🌐</div>
-        <div class="action-title">거래처 통합 등록</div>
-        <div class="action-desc">국가·업체·거래조건을 한 화면에서 관리</div>
-      </button>
-      <button class="action-card" onclick="setView('sales')">
-        <div class="action-icon">📈</div>
-        <div class="action-title">영업 현황</div>
-        <div class="action-desc">이번 달 업체별·국가별 발주 확인</div>
-      </button>
+    <div class="dashboard-hero no-print">
+      <p class="dashboard-hero-eyebrow">Barle Cosmetics</p>
+      <h2>영업 업무를 간편하게</h2>
+      <p>단가표 작성과 발주서 등록이 메인 업무입니다. 데이터 등록은 처음 한 번만 설정하면 됩니다.</p>
     </div>
 
-    <div class="card no-print">
-      <div class="card-title">처음 사용하시나요?</div>
-      <div class="card-desc">아래 순서대로 진행하시면 됩니다.</div>
-      <div class="steps-guide">
-        <div class="step-item">
-          <span class="step-num">1</span>
-          <p><strong>국가·업체·거래조건 등록</strong>판매 국가, 거래처, 거래 조건을 한 화면에서 등록합니다</p>
-        </div>
-        <div class="step-item">
-          <span class="step-num">2</span>
-          <p><strong>소비자가 입력</strong>국가별 권장 소비자가를 설정합니다 (선택)</p>
-        </div>
-        <div class="step-item">
-          <span class="step-num">3</span>
-          <p><strong>단가표 작성</strong>업체 선택 후 저장합니다</p>
+    <div class="dashboard-section no-print">
+      <p class="dashboard-section-label">메인 업무</p>
+      <div class="action-grid action-grid-main">
+        <button class="action-card primary" onclick="setView('proposal')">
+          <div class="action-icon">📋</div>
+          <div class="action-title">단가표 만들기</div>
+          <div class="action-desc">바이어에게 보낼 견적 · 가격표 작성</div>
+        </button>
+        <button class="action-card primary-alt" onclick="setView('poupload')">
+          <div class="action-icon">🧾</div>
+          <div class="action-title">발주서 등록</div>
+          <div class="action-desc">수기 입력 · 파일 업로드 → 영업 현황 반영</div>
+        </button>
+      </div>
+    </div>
+
+    <div class="dashboard-section no-print">
+      <p class="dashboard-section-label dashboard-section-label-muted">업무 조회</p>
+      <div class="action-grid action-grid-sub">
+        <button class="action-card" onclick="setView('history')">
+          <div class="action-icon">🕐</div>
+          <div class="action-title">지난 단가표</div>
+          <div class="action-desc">저장된 견적 이력 확인</div>
+        </button>
+        <button class="action-card" onclick="setView('sales')">
+          <div class="action-icon">📈</div>
+          <div class="action-title">영업 현황</div>
+          <div class="action-desc">월별 발주 · 매출 집계</div>
+        </button>
+      </div>
+    </div>
+
+    <div class="dashboard-section no-print">
+      <p class="dashboard-section-label dashboard-section-label-muted">데이터 등록</p>
+      <div class="dashboard-data-panel">
+        <p class="dashboard-data-hint">메인 업무 전에 한 번만 설정하면 됩니다</p>
+        <div class="action-grid action-grid-data">
+          <button class="action-card data-card" onclick="setView('products')">
+            <div class="action-icon">📦</div>
+            <div class="action-title">제품 등록</div>
+            <div class="action-desc">품목 · 가격 정보</div>
+          </button>
+          <button class="action-card data-card" onclick="openMaster('')">
+            <div class="action-icon">🌐</div>
+            <div class="action-title">거래처 통합 등록</div>
+            <div class="action-desc">국가 · 업체 · 거래조건</div>
+          </button>
+          <button class="action-card data-card" onclick="setView('srp')">
+            <div class="action-icon">💰</div>
+            <div class="action-title">소비자가 설정</div>
+            <div class="action-desc">국가별 권장가 (선택)</div>
+          </button>
+          <button class="action-card data-card" onclick="openMaster('')">
+            <div class="action-icon">✨</div>
+            <div class="action-title">처음 설정</div>
+            <div class="action-desc">국가 · 업체 등록부터 시작</div>
+          </button>
         </div>
       </div>
     </div>
@@ -684,43 +695,6 @@ function renderDashboard() {
           ${getQuotes(appData)[0] ? new Date(getQuotes(appData)[0].createdAt).toLocaleDateString("ko-KR") : "—"}
         </div>
         <div class="sub">${getQuotes(appData)[0]?.clientName || "아직 없음"}</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">국가별 바로가기</div>
-      <div class="card-desc">판매국가를 선택하면 단가표 작성 화면으로 이동합니다.</div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>판매국가</th>
-              <th>통화</th>
-              <th>기본 FOB 비율</th>
-              <th>저장된 단가표</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${byChannel
-              .map(
-                (ch) => `
-              <tr>
-                <td>${channelBadge(ch.id)} <strong>${ch.name}</strong></td>
-                <td>${ch.currency}</td>
-                <td>${Math.round(ch.defaultFobRate * 100)}%</td>
-                <td>${ch.count}건</td>
-                <td>
-                  <button class="btn btn-secondary btn-sm" onclick="openMaster('${ch.id}')">관리</button>
-                  <button class="btn btn-primary btn-sm" onclick="openProposal('${ch.id}')">
-                    단가표 만들기
-                  </button>
-                </td>
-              </tr>`
-              )
-              .join("")}
-          </tbody>
-        </table>
       </div>
     </div>
   `;
@@ -811,7 +785,7 @@ function renderProposal() {
       <span class="help-icon">💡</span>
       <div>
         <strong>단가표 = 견적</strong> · 바이어에게 보내는 가격표입니다. 저장해도 <strong>영업 현황(매출)에는 포함되지 않습니다.</strong><br>
-        노란 칸(소비자가, 주문수량)만 직접 입력하세요. 파란 칸(FOB, 금액)은 자동으로 계산됩니다.
+        노란 칸(소비자가, 주문수량)만 직접 입력하세요. 연두 칸(FOB, 금액)은 자동으로 계산됩니다.
       </div>
     </div>
 
