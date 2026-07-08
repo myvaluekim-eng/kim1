@@ -78,21 +78,21 @@ function exportSalesSummaryToExcel(summary, yearMonth) {
   const rows = [
     [`바를 영업 현황 — ${y}년 ${parseInt(m)}월`],
     [],
-    ["판매국가", "업체명", "발주 건수", "합계 금액", "통화", "최근 발주일"],
+    ["판매국가", "업체명", "발주 건수", "합계 ($)", "합계 (₩)", "최근 발주일"],
   ];
 
   summary.clients.forEach((c) => {
-    rows.push([c.channelName, c.clientName, c.count, c.totalAmount, c.currency, c.lastDate]);
+    rows.push([c.channelName, c.clientName, c.count, c.totalUsd || "", c.totalKrw || "", c.lastDate]);
   });
 
   rows.push([]);
   rows.push(["국가별 소계"]);
   summary.byChannel.forEach((ch) => {
-    rows.push([ch.channelName, "", ch.count, ch.totalAmount, ch.currency, ""]);
+    rows.push([ch.channelName, "", ch.count, ch.totalUsd || "", ch.totalKrw || "", ""]);
   });
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = [{ wch: 14 }, { wch: 24 }, { wch: 10 }, { wch: 16 }, { wch: 8 }, { wch: 14 }];
+  ws["!cols"] = [{ wch: 14 }, { wch: 24 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "영업현황");
   XLSX.writeFile(wb, `영업현황_${yearMonth}.xlsx`);

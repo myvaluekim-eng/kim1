@@ -85,6 +85,7 @@ let currentView = "dashboard";
 let historyFilter = "";
 let clientFilter = "";
 let salesMonth = new Date().toISOString().slice(0, 7);
+let salesChannelId = "";
 let termsChannelId = "CN";
 let masterChannelId = "CN";
 let masterNewChannel = false;
@@ -212,10 +213,76 @@ function formatProposalMoney(value, proposal, channel) {
   return formatByCurrency(value, getProposalCurrency(proposal, channel));
 }
 
+function formatDualCurrencyTotals(krw, usd, separator = " · ") {
+  const parts = [];
+  if (usd > 0) parts.push(formatUsd(usd));
+  if (krw > 0) parts.push(formatKrw(krw));
+  return parts.length ? parts.join(separator) : "—";
+}
+
+function formatDualCurrencyTotalsHtml(krw, usd) {
+  return formatDualCurrencyTotals(krw, usd, "<br>");
+}
+
 function formatProposalUnitPrice(item, proposal, channel) {
   const currency = getProposalCurrency(proposal, channel);
   if (currency === "KRW") return formatKrw(item.srpKrw ?? 0);
   return formatUsd(item.srpUsd ?? 0);
+}
+
+function renderSalesChannelDetail(channelId, summary, monthLabel) {
+  const ch = summary.byChannel.find((c) => c.channelId === channelId);
+  if (!ch || ch.count === 0) return "";
+
+  const channelClients = summary.clients
+    .filter((c) => c.channelId === channelId)
+    .sort((a, b) => b.count - a.count || b.lastDate.localeCompare(a.lastDate));
+
+  return `
+    <div class="card sales-channel-detail">
+      <div class="card-title">${ch.channelName} 발주 상세 — ${monthLabel} (${ch.count}건)</div>
+      <div class="card-desc">
+        국가 합계 ${formatDualCurrencyTotals(ch.totalKrw, ch.totalUsd)} · 업체 ${channelClients.length}곳
+      </div>
+      ${channelClients
+        .map((client) => {
+          const proposals = client.proposals
+            .slice()
+            .sort((a, b) => (b.poDate || "").localeCompare(a.poDate || "") || b.version - a.version);
+          return `
+        <div class="sales-client-block">
+          <div class="sales-client-header">
+            <div>
+              <strong>${client.clientName}</strong>
+              <span class="sales-client-count">${client.count}건</span>
+            </div>
+            <div class="sales-client-totals">${formatDualCurrencyTotalsHtml(client.totalKrw, client.totalUsd)}</div>
+          </div>
+          ${proposals
+            .map(
+              (p) => `
+            <div class="history-item">
+              <div class="history-meta">
+                <span class="badge badge-default">발주</span>
+                <span class="version">v${p.version}</span>
+                <span class="date">${p.poDate}</span>
+                ${p.poNumber ? `<span>발주번호 ${p.poNumber}</span>` : ""}
+                <span class="date">${formatProposalMoney(p.totalAmount, p, ch)}</span>
+              </div>
+              <div class="history-actions no-print">
+                <button class="btn btn-secondary btn-sm" data-view-proposal="${p.id}">보기</button>
+                <button class="btn btn-primary btn-sm" data-excel-id="${p.id}">📥 엑셀</button>
+                <button class="btn btn-danger btn-sm" data-delete-proposal="${p.id}">삭제</button>
+              </div>
+            </div>`
+            )
+            .join("")}
+        </div>`;
+        })
+        .join("")}
+    </div>
+    <div id="sales-proposal-detail"></div>
+  `;
 }
 
 function formatNumber(value, decimals = 2) {
@@ -2503,12 +2570,11 @@ function renderSales() {
 
   const channelCards = summary.byChannel
     .map((ch) => {
-      const amountStr =
-        ch.currency === "KRW"
-          ? formatKrw(ch.totalAmount)
-          : formatUsd(ch.totalAmount);
+      const amountStr = formatDualCurrencyTotalsHtml(ch.totalKrw, ch.totalUsd);
+      const isSelected = salesChannelId === ch.channelId;
       return `
-        <div class="channel-summary-card ${ch.count > 0 ? "active" : ""}">
+        <button type="button" class="channel-summary-card ${ch.count > 0 ? "active" : ""} ${isSelected ? "selected" : ""}"
+          data-sales-channel="${ch.channelId}" ${ch.count === 0 ? "disabled" : ""}>
           <div class="channel-summary-header">
             ${channelBadge(ch.channelId)}
             <strong>${ch.channelName}</strong>
@@ -2521,9 +2587,9 @@ function renderSales() {
             <div class="channel-summary-amount">${amountStr}</div>
           </div>
           <div class="channel-summary-sub">
-            ${ch.clients.length > 0 ? `업체 ${ch.clients.length}곳` : "이번 달 발주 없음"}
+            ${ch.count > 0 ? `업체 ${ch.clients.length}곳 · 클릭하여 상세 보기` : "이번 달 발주 없음"}
           </div>
-        </div>`;
+        </button>`;
     })
     .join("");
 
@@ -2548,30 +2614,12 @@ function renderSales() {
     `;
   }
 
-  const clientRows = summary.clients
-    .map(
-      (c) => `
-      <tr>
-        <td>${channelBadge(c.channelId)} ${c.channelName}</td>
-        <td><strong>${c.clientName}</strong></td>
-        <td class="text-center"><span class="count-badge">${c.count}건</span></td>
-        <td class="text-right amount-cell">${
-          c.currency === "KRW" ? formatKrw(c.totalAmount) : formatUsd(c.totalAmount)
-        }</td>
-        <td>${c.lastDate}</td>
-        <td class="no-print">
-          <button class="btn btn-secondary btn-sm" data-sales-detail="${c.channelId}::${encodeURIComponent(c.clientName)}">상세</button>
-        </td>
-      </tr>`
-    )
-    .join("");
-
   return `
     <div class="help-box no-print">
       <span class="help-icon">📈</span>
       <div>
-        <strong>${monthLabel}</strong> 기준 업체별 <strong>실제 발주(매출)</strong> 현황입니다.
-        발주서 1건 = 매출 1건으로 집계됩니다. 단가표(견적)는 포함되지 않습니다.
+        <strong>${monthLabel}</strong> 기준 <strong>실제 발주(매출)</strong> 현황입니다.
+        위 <strong>판매국가</strong>를 클릭하면 업체별 발주 상세를 볼 수 있습니다. 원화·달러는 각각 합산됩니다.
       </div>
     </div>
 
@@ -2585,7 +2633,7 @@ function renderSales() {
       </div>
     </div>
 
-    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px">
+    <div class="stats-grid sales-channel-grid" style="margin-bottom:24px">
       ${channelCards}
     </div>
 
@@ -2596,33 +2644,14 @@ function renderSales() {
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">업체별 발주 리스트 — ${monthLabel}</div>
-      <div class="card-desc">국가·업체별로 이번 달 몇 번 발주가 들어왔는지 확인하세요.</div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>판매국가</th>
-              <th>업체명</th>
-              <th style="text-align:center">발주 건수</th>
-              <th style="text-align:right">합계 금액</th>
-              <th>최근 발주일</th>
-              <th class="no-print"></th>
-            </tr>
-          </thead>
-          <tbody>${clientRows}</tbody>
-        </table>
-      </div>
-    </div>
-
-    <div id="sales-detail"></div>
+    ${salesChannelId ? renderSalesChannelDetail(salesChannelId, summary, monthLabel) : ""}
   `;
 }
 
 function bindSalesEvents() {
   document.getElementById("sales-month")?.addEventListener("change", (e) => {
     salesMonth = e.target.value;
+    salesChannelId = "";
     render();
   });
 
@@ -2632,84 +2661,63 @@ function bindSalesEvents() {
     showToast("영업현황 엑셀 다운로드 중...");
   });
 
-  document.querySelectorAll("[data-sales-detail]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const [channelId, encodedName] = e.target.dataset.salesDetail.split("::");
-      const clientName = decodeURIComponent(encodedName);
-      const summary = buildSalesSummary(appData, salesMonth);
-      const client = summary.clients.find(
-        (c) => c.channelId === channelId && c.clientName === clientName
-      );
-      if (!client) return;
-      const ch = getChannelList().find((c) => c.id === channelId);
-      const detail = document.getElementById("sales-detail");
+  document.querySelectorAll("[data-sales-channel]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const channelId = btn.dataset.salesChannel;
+      salesChannelId = salesChannelId === channelId ? "" : channelId;
+      render();
+      if (salesChannelId) {
+        document.querySelector(".sales-channel-detail")?.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-view-proposal]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const proposal = getProposalById(appData, b.dataset.viewProposal);
+      if (!proposal) return;
+      if (getRecordType(proposal) === "quote") {
+        historyFilter = proposal.channelId;
+        setView("history");
+        setTimeout(() => {
+          document.querySelector(`[data-view-id="${b.dataset.viewProposal}"]`)?.click();
+        }, 100);
+        return;
+      }
+      const ch = getChannelList().find((c) => c.id === proposal.channelId);
+      const detail = document.getElementById("sales-proposal-detail");
+      if (!detail) return;
       detail.innerHTML = `
         <div class="card" style="margin-top:20px">
-          <div class="card-title">${clientName} — ${ch.name} 발주 상세 (${client.count}건)</div>
-          ${client.proposals
-            .map(
-              (p) => `
-            <div class="history-item">
-              <div class="history-meta">
-                <span class="badge badge-default">발주</span>
-                <span class="version">v${p.version}</span>
-                <span class="date">${p.poDate}</span>
-                ${p.poNumber ? `<span>발주번호 ${p.poNumber}</span>` : ""}
-                <span class="date">${formatProposalMoney(p.totalAmount, p, ch)}</span>
-              </div>
-              <div class="history-actions no-print">
-                <button class="btn btn-secondary btn-sm" data-view-proposal="${p.id}">보기</button>
-                <button class="btn btn-primary btn-sm" data-excel-id="${p.id}">📥 엑셀</button>
-                <button class="btn btn-danger btn-sm" data-delete-proposal="${p.id}">삭제</button>
-              </div>
-            </div>`
-            )
-            .join("")}
-        </div>
-      `;
-      detail.querySelectorAll("[data-view-proposal]").forEach((b) => {
-        b.addEventListener("click", () => {
-          const proposal = getProposalById(appData, b.dataset.viewProposal);
-          if (!proposal) return;
-          if (getRecordType(proposal) === "quote") {
-            historyFilter = channelId;
-            setView("history");
-            setTimeout(() => {
-              document.querySelector(`[data-view-id="${b.dataset.viewProposal}"]`)?.click();
-            }, 100);
-            return;
-          }
-          const ch = getChannelList().find((c) => c.id === proposal.channelId);
-          detail.innerHTML = `
-            <div class="card" style="margin-top:20px">
-              <div class="card-title">발주 상세 — ${proposal.clientName} · ${proposal.poDate}</div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr><th>제품코드</th><th>제품명</th><th>발주수량</th><th>단가</th><th>금액</th></tr>
-                  </thead>
-                  <tbody>
-                    ${proposal.items.map((item) => `
-                      <tr>
-                        <td><code>${item.productCode}</code></td>
-                        <td>${item.nameKor}</td>
-                        <td>${item.poQty}</td>
-                        <td>${formatProposalUnitPrice(item, proposal, ch)}</td>
-                        <td>${formatProposalMoney(item.amount, proposal, ch)}</td>
-                      </tr>`).join("")}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colspan="4" style="text-align:right;font-weight:700">Total</td>
-                      <td class="total-row">${formatProposalMoney(proposal.totalAmount, proposal, ch)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>`;
-          detail.scrollIntoView({ behavior: "smooth" });
-        });
-      });
+          <div class="card-title">발주 상세 — ${proposal.clientName} · ${proposal.poDate}</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>제품코드</th><th>제품명</th><th>발주수량</th><th>단가</th><th>금액</th></tr>
+              </thead>
+              <tbody>
+                ${proposal.items
+                  .map(
+                    (item) => `
+                  <tr>
+                    <td><code>${item.productCode}</code></td>
+                    <td>${item.nameKor}</td>
+                    <td>${item.poQty}</td>
+                    <td>${formatProposalUnitPrice(item, proposal, ch)}</td>
+                    <td>${formatProposalMoney(item.amount, proposal, ch)}</td>
+                  </tr>`
+                  )
+                  .join("")}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4" style="text-align:right;font-weight:700">Total</td>
+                  <td class="total-row">${formatProposalMoney(proposal.totalAmount, proposal, ch)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>`;
       detail.scrollIntoView({ behavior: "smooth" });
     });
   });

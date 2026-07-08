@@ -382,32 +382,44 @@ function buildSalesSummary(data, yearMonth) {
       clientMap[key] = {
         channelId: p.channelId,
         channelName: ch?.name || p.channelId,
-        currency: getProposalCurrency(p, ch),
         clientName: p.clientName,
         count: 0,
-        totalAmount: 0,
+        totalKrw: 0,
+        totalUsd: 0,
         lastDate: "",
         proposals: [],
       };
     }
     const entry = clientMap[key];
+    const currency = getProposalCurrency(p, ch);
     entry.count += 1;
-    entry.totalAmount += p.totalAmount || 0;
+    if (currency === "KRW") entry.totalKrw += p.totalAmount || 0;
+    else entry.totalUsd += p.totalAmount || 0;
     entry.proposals.push(p);
     const date = getProposalDate(p);
     if (date > entry.lastDate) entry.lastDate = date;
   });
 
-  const clients = Object.values(clientMap).sort((a, b) => b.count - a.count || b.totalAmount - a.totalAmount);
+  const clients = Object.values(clientMap).sort(
+    (a, b) => b.count - a.count || b.totalKrw + b.totalUsd - (a.totalKrw + a.totalUsd)
+  );
 
   const byChannel = getChannels(data).map((ch) => {
     const channelProposals = proposals.filter((p) => p.channelId === ch.id);
+    const totals = { krw: 0, usd: 0 };
+    channelProposals.forEach((p) => {
+      const currency = getProposalCurrency(p, ch);
+      if (currency === "KRW") totals.krw += p.totalAmount || 0;
+      else totals.usd += p.totalAmount || 0;
+    });
     return {
       channelId: ch.id,
       channelName: ch.name,
       currency: ch.currency,
       count: channelProposals.length,
-      totalAmount: channelProposals.reduce((s, p) => s + (p.totalAmount || 0), 0),
+      totalKrw: totals.krw,
+      totalUsd: totals.usd,
+      proposals: channelProposals,
       clients: [...new Set(channelProposals.map((p) => p.clientName))],
     };
   });
