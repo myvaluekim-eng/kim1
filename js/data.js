@@ -99,7 +99,7 @@ const DEFAULT_PRODUCTS = [
   },
 ];
 
-const CHANNELS = [
+const DEFAULT_CHANNELS = [
   {
     id: "KR-OLIVE",
     name: "올리브영",

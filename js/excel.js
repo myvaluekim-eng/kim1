@@ -4,7 +4,7 @@ function exportProposalToExcel(proposal) {
     return;
   }
 
-  const ch = CHANNELS.find((c) => c.id === proposal.channelId);
+  const ch = getChannels(appData).find((c) => c.id === proposal.channelId);
   const rows = [
     ["PRODUCT & PRICE LIST"],
     ["채널", ch.name],

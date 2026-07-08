@@ -9,34 +9,45 @@ function normalizeSrpEntry(value) {
   };
 }
 
+function getChannels(data) {
+  return data.channels?.length ? data.channels : structuredClone(DEFAULT_CHANNELS);
+}
+
 function initChannelSrpForProduct(data, productCode) {
   if (!data.channelSrp[productCode]) {
     data.channelSrp[productCode] = {};
-    CHANNELS.forEach((ch) => {
-      data.channelSrp[productCode][ch.id] = { krw: null, usd: null };
-    });
   }
+  getChannels(data).forEach((ch) => {
+    if (!data.channelSrp[productCode][ch.id]) {
+      data.channelSrp[productCode][ch.id] = { krw: null, usd: null };
+    }
+  });
+}
+
+function migrateChannels(data) {
+  if (!data.channels || data.channels.length === 0) {
+    data.channels = structuredClone(DEFAULT_CHANNELS);
+  }
+  if (!data.channelTerms) data.channelTerms = {};
+  getChannels(data).forEach((ch) => {
+    if (!data.channelTerms[ch.id]) {
+      const def = DEFAULT_CHANNELS.find((d) => d.id === ch.id);
+      data.channelTerms[ch.id] = def ? [...def.terms] : [...(ch.terms || [])];
+    }
+  });
 }
 
 function migrateData(data) {
   if (!data.products || data.products.length === 0) {
     data.products = structuredClone(DEFAULT_PRODUCTS);
   }
+  migrateChannels(data);
   if (!data.channelSrp) data.channelSrp = structuredClone(DEFAULT_SRP);
   getProducts(data).forEach((p) => {
     initChannelSrpForProduct(data, p.code);
-    CHANNELS.forEach((ch) => {
+    getChannels(data).forEach((ch) => {
       data.channelSrp[p.code][ch.id] = normalizeSrpEntry(data.channelSrp[p.code][ch.id]);
     });
-  });
-  if (!data.channelTerms) {
-    data.channelTerms = {};
-    CHANNELS.forEach((ch) => {
-      data.channelTerms[ch.id] = [...ch.terms];
-    });
-  }
-  CHANNELS.forEach((ch) => {
-    if (!data.channelTerms[ch.id]) data.channelTerms[ch.id] = [...ch.terms];
   });
   if (!data.exchangeRate) data.exchangeRate = DEFAULT_EXCHANGE_RATE;
   if (!data.proposals) data.proposals = [];
@@ -67,8 +78,9 @@ function loadData() {
   } catch (_) {}
   return migrateData({
     products: structuredClone(DEFAULT_PRODUCTS),
+    channels: structuredClone(DEFAULT_CHANNELS),
     channelSrp: structuredClone(DEFAULT_SRP),
-    channelTerms: Object.fromEntries(CHANNELS.map((ch) => [ch.id, [...ch.terms]])),
+    channelTerms: Object.fromEntries(DEFAULT_CHANNELS.map((ch) => [ch.id, [...ch.terms]])),
     exchangeRate: DEFAULT_EXCHANGE_RATE,
     proposals: [],
     clients: [],
@@ -106,7 +118,81 @@ function deleteProduct(data, code) {
 }
 
 function getChannelTerms(data, channelId) {
-  return data.channelTerms?.[channelId] ?? CHANNELS.find((c) => c.id === channelId)?.terms ?? [];
+  return data.channelTerms?.[channelId] ?? DEFAULT_CHANNELS.find((c) => c.id === channelId)?.terms ?? [];
+}
+
+function getDefaultChannelTerms(data, channelId) {
+  const def = DEFAULT_CHANNELS.find((c) => c.id === channelId);
+  if (def) return [...def.terms];
+  const ch = getChannels(data).find((c) => c.id === channelId);
+  return ch?.terms ? [...ch.terms] : [];
+}
+
+function addChannel(data, channel) {
+  const id = channel.id?.trim().toUpperCase();
+  if (!id) return { ok: false, error: "채널 코드를 입력해주세요." };
+  if (!/^[A-Z0-9-]+$/.test(id)) {
+    return { ok: false, error: "채널 코드는 영문, 숫자, 하이픈(-)만 사용할 수 있습니다." };
+  }
+  const name = channel.name?.trim();
+  if (!name) return { ok: false, error: "채널명을 입력해주세요." };
+
+  const channels = getChannels(data);
+  if (channels.some((c) => c.id === id)) {
+    return { ok: false, error: "이미 존재하는 채널 코드입니다." };
+  }
+
+  const currency = channel.currency === "KRW" ? "KRW" : "USD";
+  const fobPercent = parseFloat(channel.defaultFobRate);
+  const newChannel = {
+    id,
+    name,
+    currency,
+    currencySymbol: currency === "KRW" ? "₩" : "$",
+    defaultFobRate: (isNaN(fobPercent) ? 30 : fobPercent) / 100,
+    terms: [],
+  };
+
+  data.channels = [...channels, newChannel];
+  getProducts(data).forEach((p) => {
+    if (!data.channelSrp[p.code]) data.channelSrp[p.code] = {};
+    data.channelSrp[p.code][id] = { krw: null, usd: null };
+  });
+  if (!data.channelTerms) data.channelTerms = {};
+  data.channelTerms[id] = [];
+  saveData(data);
+  return { ok: true };
+}
+
+function deleteChannel(data, channelId) {
+  const channels = getChannels(data);
+  if (channels.length <= 1) {
+    return { ok: false, error: "최소 1개 채널은 유지해야 합니다." };
+  }
+
+  const clientCount = (data.clients || []).filter((c) => c.channelId === channelId).length;
+  const proposalCount = data.proposals.filter((p) => p.channelId === channelId).length;
+  if (clientCount > 0 || proposalCount > 0) {
+    return {
+      ok: false,
+      error: `이 채널에 등록된 업체 ${clientCount}개, 단가표 ${proposalCount}건이 있어 삭제할 수 없습니다.`,
+    };
+  }
+
+  data.channels = channels.filter((c) => c.id !== channelId);
+  getProducts(data).forEach((p) => {
+    if (data.channelSrp[p.code]) delete data.channelSrp[p.code][channelId];
+  });
+  if (data.channelTerms) delete data.channelTerms[channelId];
+  saveData(data);
+  return { ok: true };
+}
+
+function getChannelUsage(data, channelId) {
+  return {
+    clients: (data.clients || []).filter((c) => c.channelId === channelId).length,
+    proposals: data.proposals.filter((p) => p.channelId === channelId).length,
+  };
 }
 
 function setChannelTerms(data, channelId, terms) {
@@ -163,13 +249,13 @@ function buildSalesSummary(data, yearMonth) {
   const clientMap = {};
 
   proposals.forEach((p) => {
-    const ch = CHANNELS.find((c) => c.id === p.channelId);
+    const ch = getChannels(data).find((c) => c.id === p.channelId);
     const key = `${p.channelId}::${p.clientName}`;
     if (!clientMap[key]) {
       clientMap[key] = {
         channelId: p.channelId,
-        channelName: ch.name,
-        currency: ch.currency,
+        channelName: ch?.name || p.channelId,
+        currency: ch?.currency || "USD",
         clientName: p.clientName,
         count: 0,
         totalAmount: 0,
@@ -187,7 +273,7 @@ function buildSalesSummary(data, yearMonth) {
 
   const clients = Object.values(clientMap).sort((a, b) => b.count - a.count || b.totalAmount - a.totalAmount);
 
-  const byChannel = CHANNELS.map((ch) => {
+  const byChannel = getChannels(data).map((ch) => {
     const channelProposals = proposals.filter((p) => p.channelId === ch.id);
     return {
       channelId: ch.id,
@@ -260,7 +346,7 @@ function deleteProposal(data, id) {
 
 function clearSrpForProduct(data, productCode) {
   if (!data.channelSrp[productCode]) return { ok: false, error: "제품을 찾을 수 없습니다." };
-  CHANNELS.forEach((ch) => {
+  getChannels(data).forEach((ch) => {
     data.channelSrp[productCode][ch.id] = { krw: null, usd: null };
   });
   saveData(data);

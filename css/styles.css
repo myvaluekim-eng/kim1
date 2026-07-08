@@ -552,10 +552,174 @@ body {
   gap: 14px 18px;
 }
 
-.form-grid .form-group input {
+.form-grid .form-group input,
+.form-grid .form-group select {
   min-width: 0;
   width: 100%;
 }
+
+.form-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.proposal-meta-panel {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(240px, 2fr) minmax(150px, 1fr);
+  gap: 16px 20px;
+  align-items: start;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.proposal-meta-panel .form-group input,
+.proposal-meta-panel .form-group select {
+  min-width: 0;
+  width: 100%;
+}
+
+.proposal-meta-panel .form-group-client {
+  min-width: 0;
+}
+
+.proposal-meta-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 14px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+}
+
+.form-group label .required {
+  color: #dc2626;
+}
+
+
+.input-with-action {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.input-with-action select,
+.input-with-action input {
+  flex: 1;
+  min-width: 0;
+}
+
+.input-with-action .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  align-self: stretch;
+}
+
+.field-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.badge-default {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+/* ── PO upload ── */
+.po-dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.po-dropzone:hover,
+.po-dropzone.dragover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.po-dropzone-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.po-dropzone p {
+  margin: 2px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.po-dropzone-sub {
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+}
+
+.po-dropzone-file {
+  margin-top: 10px !important;
+  font-weight: 600;
+  color: var(--text) !important;
+}
+
+.po-status {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.po-status-parsing {
+  background: var(--primary-light);
+  color: #1e40af;
+}
+
+.po-status-error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.po-status-warn {
+  background: var(--warning-light);
+  color: #92400e;
+}
+
+tr.po-row-unmatched {
+  background: #fff7ed;
+}
+
+.po-hint-warn {
+  color: #b45309 !important;
+}
+
+.client-modal-header {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+  padding-bottom: 16px;
+}
+
+.client-modal-body {
+  padding: 20px 24px 24px;
+}
+
+.client-modal-body .form-group {
+  margin-bottom: 14px;
+}
+
+.client-modal-body .form-group:last-of-type {
+  margin-bottom: 20px;
+}
+
+.client-modal-body .form-group select,
+.client-modal-body .form-group input {
+  width: 100%;
+}
+
 
 /* ── Buttons ── */
 .btn {
@@ -1170,4 +1334,5 @@ td.total-row {
   .topbar { padding: 14px 16px; }
   .stats-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
+  .proposal-meta-panel { grid-template-columns: 1fr; }
 }

@@ -13,14 +13,41 @@ let proposalState = {
   items: {},
 };
 
+let quickClientCallback = null;
+
+function freshPoUploadState() {
+  return {
+    channelId: "CN",
+    clientName: "",
+    poDate: new Date().toISOString().slice(0, 10),
+    poNumber: "",
+    fileName: "",
+    fileKind: "",
+    rows: [],
+    status: "idle",
+    statusMsg: "",
+    warning: "",
+  };
+}
+
+let poUploadState = freshPoUploadState();
+
+function getChannelList() {
+  return getChannels(appData);
+}
+
+function findChannel(channelId) {
+  return getChannelList().find((c) => c.id === channelId) || getChannelList()[0];
+}
+
 function initProposalState(channelId) {
-  const channel = CHANNELS.find((c) => c.id === channelId);
-  proposalState.channelId = channelId;
+  const channel = findChannel(channelId);
+  proposalState.channelId = channel.id;
   proposalState.fobRate = Math.round(channel.defaultFobRate * 100);
   proposalState.exchangeRate = appData.exchangeRate || DEFAULT_EXCHANGE_RATE;
   proposalState.items = {};
   getProducts(appData).forEach((p) => {
-    const srp = getChannelSrp(appData, p.code, channelId);
+    const srp = getChannelSrp(appData, p.code, channel.id);
     proposalState.items[p.code] = {
       srpKrw: srp.krw,
       srpUsd: srp.usd,
@@ -91,12 +118,13 @@ function formatNumber(value, decimals = 2) {
 }
 
 function channelBadge(channelId) {
-  const map = {
-    "KR-OLIVE": '<span class="badge badge-olive">올리브영</span>',
-    CN: '<span class="badge badge-cn">중국</span>',
-    US: '<span class="badge badge-us">미국</span>',
-  };
-  return map[channelId] || channelId;
+  const ch = getChannelList().find((c) => c.id === channelId);
+  const badgeClass = {
+    "KR-OLIVE": "badge-olive",
+    CN: "badge-cn",
+    US: "badge-us",
+  }[channelId] || "badge-default";
+  return `<span class="badge ${badgeClass}">${ch?.name || channelId}</span>`;
 }
 
 function showToast(msg) {
@@ -224,7 +252,7 @@ function setupGlobalDeleteHandlers() {
       const id = proposalBtn.dataset.deleteProposal;
       const proposal = getProposalById(appData, id);
       if (!proposal) return;
-      const ch = CHANNELS.find((c) => c.id === proposal.channelId);
+      const ch = getChannelList().find((c) => c.id === proposal.channelId);
       if (
         !(await confirmDelete(
           "단가표 삭제",
@@ -247,8 +275,10 @@ function setupGlobalDeleteHandlers() {
 const PAGE_META = {
   dashboard: { title: "시작하기", desc: "무엇을 하실지 선택하세요. 처음이시면 아래 순서를 따라하시면 됩니다." },
   proposal: { title: "단가표 만들기", desc: "① 채널·업체 입력 → ② 가격 확인 → ③ 저장 버튼 클릭" },
+  poupload: { title: "발주서 등록", desc: "발주서 파일(엑셀) 또는 이미지를 올리면 자동으로 인식해 영업 현황에 반영합니다." },
   products: { title: "제품 등록", desc: "새로 출시된 제품을 등록하거나 기존 제품을 관리합니다." },
-  clients: { title: "업체 등록", desc: "거래처(업체)를 등록하거나 삭제합니다. 등록한 업체는 단가표 작성 시 선택할 수 있습니다." },
+  channels: { title: "판매채널 등록", desc: "판매 채널을 추가하거나 삭제합니다. 채널별 통화·FOB 비율이 단가표에 반영됩니다." },
+  clients: { title: "업체 등록", desc: "거래처(업체)를 등록하거나 삭제합니다. 단가표 작성 화면에서도 바로 등록할 수 있습니다." },
   srp: { title: "소비자가 설정", desc: "채널별 권장 소비자가를 미리 입력해 두면 단가표에 자동으로 채워집니다." },
   history: { title: "지난 단가표", desc: "이전에 저장한 단가표를 다시 확인하거나 엑셀로 다운로드합니다." },
   sales: { title: "영업 현황", desc: "이번 달 업체별·채널별 발주 건수와 금액을 한눈에 확인합니다." },
@@ -278,9 +308,17 @@ function render() {
       content.innerHTML = renderProposal();
       bindProposalEvents();
       break;
+    case "poupload":
+      content.innerHTML = renderPoUpload();
+      bindPoUploadEvents();
+      break;
     case "products":
       content.innerHTML = renderProducts();
       bindProductEvents();
+      break;
+    case "channels":
+      content.innerHTML = renderChannels();
+      bindChannelEvents();
       break;
     case "clients":
       content.innerHTML = renderClients();
@@ -305,10 +343,86 @@ function render() {
   }
 }
 
+function renderChannelOptions(selectedId) {
+  return getChannelList()
+    .map(
+      (ch) =>
+        `<option value="${ch.id}" ${ch.id === selectedId ? "selected" : ""}>${ch.name}</option>`
+    )
+    .join("");
+}
+
+function refreshProposalClientSelect(clientName) {
+  const clientSelect = document.getElementById("client-select");
+  if (!clientSelect) return;
+  clientSelect.innerHTML = getClientSelectOptions(proposalState.channelId, clientName);
+  proposalState.clientName = clientName || "";
+  if (clientName) clientSelect.value = clientName;
+}
+
+function openAddClientModal(prefillChannelId, onRegistered, prefillName) {
+  const overlay = document.getElementById("client-modal-overlay");
+  const form = document.getElementById("quick-client-form");
+  const channelSelect = document.getElementById("quick-client-channel");
+  if (!overlay || !form || !channelSelect) return;
+
+  channelSelect.innerHTML = renderChannelOptions(prefillChannelId || proposalState.channelId);
+  form.reset();
+  if (prefillChannelId) channelSelect.value = prefillChannelId;
+  if (prefillName) form.querySelector('[name="name"]').value = prefillName;
+  quickClientCallback = onRegistered || null;
+  overlay.hidden = false;
+  form.querySelector('[name="name"]')?.focus();
+}
+
+function closeAddClientModal() {
+  const overlay = document.getElementById("client-modal-overlay");
+  if (overlay) overlay.hidden = true;
+  quickClientCallback = null;
+}
+
+function setupClientModal() {
+  const overlay = document.getElementById("client-modal-overlay");
+  const form = document.getElementById("quick-client-form");
+  const cancelBtn = document.getElementById("client-modal-cancel");
+  if (!overlay || !form) return;
+
+  cancelBtn?.addEventListener("click", closeAddClientModal);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeAddClientModal();
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const name = fd.get("name")?.toString().trim() || "";
+    const channelId = fd.get("channelId")?.toString() || "";
+    const result = addClient(appData, {
+      channelId,
+      name,
+      contact: fd.get("contact"),
+      memo: fd.get("memo"),
+    });
+    if (!result.ok) {
+      showToast(result.error);
+      return;
+    }
+    showToast(`"${name}" 업체가 등록되었습니다`);
+    const callback = quickClientCallback;
+    closeAddClientModal();
+    if (callback) {
+      callback({ name, channelId });
+    } else if (currentView === "clients") {
+      render();
+    }
+  });
+}
+
 function renderDashboard() {
   const products = getProducts(appData);
   const totalProposals = appData.proposals.length;
-  const byChannel = CHANNELS.map((ch) => ({
+  const channels = getChannelList();
+  const byChannel = channels.map((ch) => ({
     ...ch,
     count: appData.proposals.filter((p) => p.channelId === ch.id).length,
   }));
@@ -320,6 +434,11 @@ function renderDashboard() {
         <div class="action-title">단가표 만들기</div>
         <div class="action-desc">업체에 보낼 가격표를 작성하고 저장합니다</div>
       </button>
+      <button class="action-card" onclick="setView('poupload')">
+        <div class="action-icon">🧾</div>
+        <div class="action-title">발주서 등록</div>
+        <div class="action-desc">발주서 파일이나 이미지를 올리면 자동으로 인식합니다</div>
+      </button>
       <button class="action-card" onclick="setView('history')">
         <div class="action-icon">🕐</div>
         <div class="action-title">지난 단가표 보기</div>
@@ -329,6 +448,11 @@ function renderDashboard() {
         <div class="action-icon">📦</div>
         <div class="action-title">제품 등록</div>
         <div class="action-desc">신규 제품을 추가합니다</div>
+      </button>
+      <button class="action-card" onclick="openAddClientModal('')">
+        <div class="action-icon">🏢</div>
+        <div class="action-title">업체 등록</div>
+        <div class="action-desc">거래처를 바로 추가합니다</div>
       </button>
       <button class="action-card" onclick="setView('sales')">
         <div class="action-icon">📈</div>
@@ -343,7 +467,7 @@ function renderDashboard() {
       <div class="steps-guide">
         <div class="step-item">
           <span class="step-num">1</span>
-          <p><strong>업체·제품 등록</strong>거래처와 신규 제품을 먼저 등록합니다</p>
+          <p><strong>채널·업체·제품 등록</strong>판매 채널과 거래처, 제품을 먼저 등록합니다</p>
         </div>
         <div class="step-item">
           <span class="step-num">2</span>
@@ -363,8 +487,8 @@ function renderDashboard() {
       </div>
       <div class="stat-card">
         <div class="label">관리 채널</div>
-        <div class="value">${CHANNELS.length}<span style="font-size:16px">개</span></div>
-        <div class="sub">올리브영 · 중국 · 미국</div>
+        <div class="value">${channels.length}<span style="font-size:16px">개</span></div>
+        <div class="sub">${channels.map((c) => c.name).join(" · ")}</div>
       </div>
       <div class="stat-card">
         <div class="label">저장된 단가표</div>
@@ -425,23 +549,23 @@ function getClientSelectOptions(channelId, selectedName) {
         `<option value="${c.name}" ${c.name === selectedName ? "selected" : ""}>${c.name}</option>`
     )
     .join("");
-  const isCustom =
-    selectedName && !clients.some((c) => c.name === selectedName);
+  const isRegistered = selectedName && clients.some((c) => c.name === selectedName);
+  const legacyOption =
+    selectedName && !isRegistered
+      ? `<option value="${selectedName}" selected>${selectedName}</option>`
+      : "";
   return `
     <option value="">업체를 선택하세요</option>
     ${options}
-    <option value="__custom__" ${isCustom ? "selected" : ""}>직접 입력</option>
+    ${legacyOption}
   `;
 }
 
 function renderProposal() {
-  const channel = CHANNELS.find((c) => c.id === proposalState.channelId);
+  const channel = getChannelList().find((c) => c.id === proposalState.channelId);
   const products = getProducts(appData);
   const terms = getChannelTerms(appData, proposalState.channelId);
   const channelClients = getClients(appData, proposalState.channelId);
-  const isCustomClient =
-    proposalState.clientName &&
-    !channelClients.some((c) => c.name === proposalState.clientName);
   let totalAmount = 0;
   let totalCtn = 0;
   let totalCbm = 0;
@@ -508,31 +632,32 @@ function renderProposal() {
 
     <div class="section-block no-print">
       <div class="section-label">① 기본 정보 입력</div>
-      <div class="form-row">
+      <div class="proposal-meta-panel">
         <div class="form-group">
           <label>판매 채널</label>
           <select id="channel-select">
-            ${CHANNELS.map(
-              (ch) =>
-                `<option value="${ch.id}" ${ch.id === proposalState.channelId ? "selected" : ""}>${ch.name}</option>`
-            ).join("")}
+            ${renderChannelOptions(proposalState.channelId)}
           </select>
         </div>
-        <div class="form-group">
-          <label>업체명 (필수)</label>
-          <select id="client-select">
-            ${getClientSelectOptions(proposalState.channelId, proposalState.clientName)}
-          </select>
-          <input type="text" id="client-name" placeholder="업체명 직접 입력"
-            value="${isCustomClient ? proposalState.clientName : ""}"
-            style="margin-top:8px;${isCustomClient || !channelClients.length ? "" : "display:none"}" ${!isCustomClient && channelClients.length ? "" : ""}>
-          ${channelClients.length === 0 ? `<p style="font-size:12px;color:var(--text-muted);margin-top:6px"><a href="#" id="go-clients" style="color:var(--primary)">업체 등록하기 →</a></p>` : ""}
+        <div class="form-group form-group-client">
+          <label>업체명 <span class="required">*</span></label>
+          <div class="input-with-action">
+            <select id="client-select">
+              ${getClientSelectOptions(proposalState.channelId, proposalState.clientName)}
+            </select>
+            <button type="button" class="btn btn-secondary" id="btn-quick-client">+ 신규</button>
+          </div>
+          ${
+            channelClients.length === 0
+              ? `<span class="field-hint">등록된 업체가 없습니다. <strong>+ 신규</strong> 버튼으로 추가하세요.</span>`
+              : ""
+          }
         </div>
         <div class="form-group">
           <label>작성일</label>
           <input type="date" id="po-date" value="${proposalState.poDate}">
         </div>
-        <div style="margin-left:auto;display:flex;gap:10px;align-items:flex-end">
+        <div class="proposal-meta-actions">
           <button class="btn btn-secondary" id="btn-print">🖨 인쇄</button>
           <button class="btn btn-success btn-lg" id="btn-save">💾 저장하기</button>
         </div>
@@ -605,7 +730,7 @@ function renderProposal() {
 }
 
 function bindProposalEvents() {
-  const channel = CHANNELS.find((c) => c.id === proposalState.channelId);
+  const channel = getChannelList().find((c) => c.id === proposalState.channelId);
 
   document.getElementById("channel-select").addEventListener("change", (e) => {
     initProposalState(e.target.value);
@@ -614,30 +739,23 @@ function bindProposalEvents() {
   });
 
   const clientSelect = document.getElementById("client-select");
-  const clientNameInput = document.getElementById("client-name");
 
   if (clientSelect) {
     clientSelect.addEventListener("change", (e) => {
-      if (e.target.value === "__custom__") {
-        clientNameInput.style.display = "";
-        clientNameInput.focus();
-        proposalState.clientName = clientNameInput.value;
-      } else {
-        clientNameInput.style.display = "none";
-        proposalState.clientName = e.target.value;
-      }
-    });
-  }
-
-  if (clientNameInput) {
-    clientNameInput.addEventListener("input", (e) => {
       proposalState.clientName = e.target.value;
     });
   }
 
-  document.getElementById("go-clients")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    setView("clients");
+  document.getElementById("btn-quick-client")?.addEventListener("click", () => {
+    openAddClientModal(proposalState.channelId, ({ name, channelId }) => {
+      if (channelId !== proposalState.channelId) {
+        initProposalState(channelId);
+        proposalState.clientName = name;
+        render();
+        return;
+      }
+      refreshProposalClientSelect(name);
+    });
   });
 
   document.getElementById("po-date").addEventListener("change", (e) => {
@@ -681,15 +799,10 @@ function bindProposalEvents() {
   document.getElementById("btn-save").addEventListener("click", () => {
     if (!proposalState.clientName.trim()) {
       const select = document.getElementById("client-select");
-      const nameInput = document.getElementById("client-name");
-      if (select?.value === "__custom__") {
-        proposalState.clientName = nameInput?.value?.trim() || "";
-      } else if (select?.value) {
-        proposalState.clientName = select.value;
-      }
+      if (select?.value) proposalState.clientName = select.value;
     }
     if (!proposalState.clientName.trim()) {
-      showToast("업체명을 선택하거나 입력해주세요");
+      showToast("업체를 선택하거나 + 신규로 등록해주세요");
       return;
     }
     const products = getProducts(appData);
@@ -770,6 +883,358 @@ function updateProposalCalcs(channel) {
   if (totalAmtEl) totalAmtEl.textContent = formatMoney(totalAmount, channel);
   if (totalCtnEl) totalCtnEl.textContent = formatNumber(totalCtn, 2);
   if (totalCbmEl) totalCbmEl.textContent = formatNumber(totalCbm, 4);
+}
+
+function renderPoRow(r, i) {
+  const products = getProducts(appData);
+  const matched = !!r.matchedCode;
+  return `
+    <tr data-row-index="${i}" class="${matched ? "" : "po-row-unmatched"}">
+      <td><code>${r.barcode || "-"}</code></td>
+      <td class="editable">
+        <select class="input-cell" data-po-field="matchedCode" data-row-index="${i}">
+          <option value="">${matched ? "매칭 안됨으로 변경" : "-- 제품 선택 --"}</option>
+          ${products
+            .map(
+              (p) =>
+                `<option value="${p.code}" ${p.code === r.matchedCode ? "selected" : ""}>${p.nameKor} (${p.code})</option>`
+            )
+            .join("")}
+        </select>
+        ${!matched ? `<span class="field-hint po-hint-warn">인식된 품명: ${r.name || "-"}</span>` : ""}
+      </td>
+      <td>${r.spec || "-"}</td>
+      <td>${r.unit || "-"}</td>
+      <td class="editable">
+        <input class="input-cell" type="date" data-po-field="dueDate" data-row-index="${i}" value="${r.dueDate || ""}">
+      </td>
+      <td class="editable">
+        <input class="input-cell" type="number" step="1" min="0" data-po-field="qty" data-row-index="${i}" value="${r.qty ?? ""}">
+      </td>
+      <td class="editable">
+        <input class="input-cell" type="number" step="1" min="0" data-po-field="unitPrice" data-row-index="${i}" value="${r.unitPrice ?? ""}">
+      </td>
+      <td class="editable">
+        <input class="input-cell" type="number" step="1" min="0" data-po-field="amount" data-row-index="${i}" value="${r.amount ?? ""}">
+      </td>
+      <td><button class="btn btn-danger btn-sm" data-po-remove-row="${i}">삭제</button></td>
+    </tr>
+  `;
+}
+
+function renderPoUpload() {
+  const channel = findChannel(poUploadState.channelId);
+  const channelClients = getClients(appData, poUploadState.channelId);
+  const rows = poUploadState.rows;
+  const totalAmount = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
+  const matchedCount = rows.filter((r) => r.matchedCode).length;
+
+  return `
+    <div class="help-box no-print">
+      <span class="help-icon">🧾</span>
+      <div>
+        <strong>발주서 업로드</strong><br>
+        엑셀 파일은 표를 자동으로 인식합니다. 이미지(사진·스캔본)는 OCR로 베타 인식하므로 저장 전 값을 꼭 확인해주세요.
+      </div>
+    </div>
+
+    <div class="section-block no-print">
+      <div class="section-label">① 채널·업체 입력</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>판매 채널</label>
+          <select id="po-channel-select">${renderChannelOptions(poUploadState.channelId)}</select>
+        </div>
+        <div class="form-group form-group-client">
+          <label>업체명 <span class="required">*</span></label>
+          <div class="input-with-action">
+            <select id="po-client-select">
+              ${getClientSelectOptions(poUploadState.channelId, poUploadState.clientName)}
+            </select>
+            <button type="button" class="btn btn-secondary" id="po-btn-quick-client">+ 신규</button>
+          </div>
+          ${
+            channelClients.length === 0
+              ? `<span class="field-hint">등록된 업체가 없습니다. <strong>+ 신규</strong> 버튼으로 추가하세요.</span>`
+              : ""
+          }
+        </div>
+        <div class="form-group">
+          <label>작성일</label>
+          <input type="date" id="po-date" value="${poUploadState.poDate}">
+        </div>
+        <div class="form-group">
+          <label>발주번호</label>
+          <input type="text" id="po-number" placeholder="자동 인식 또는 직접 입력" value="${poUploadState.poNumber || ""}">
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block no-print">
+      <div class="section-label">② 발주서 파일 업로드</div>
+      <div class="po-dropzone" id="po-dropzone">
+        <input type="file" id="po-file-input" accept=".xlsx,.xls,.csv,image/png,image/jpeg,image/jpg" hidden>
+        <div class="po-dropzone-icon">📎</div>
+        <p><strong>클릭하거나 파일을 끌어다 놓으세요</strong></p>
+        <p class="po-dropzone-sub">엑셀(.xlsx, .xls, .csv) 또는 이미지(사진, 스캔본)</p>
+        ${poUploadState.fileName ? `<p class="po-dropzone-file">📄 ${poUploadState.fileName}</p>` : ""}
+      </div>
+      ${
+        poUploadState.status === "parsing"
+          ? `<div class="po-status po-status-parsing">${poUploadState.statusMsg || "인식 중..."}</div>`
+          : ""
+      }
+      ${poUploadState.status === "error" ? `<div class="po-status po-status-error">⚠️ ${poUploadState.statusMsg}</div>` : ""}
+      ${poUploadState.warning ? `<div class="po-status po-status-warn">⚠️ ${poUploadState.warning}</div>` : ""}
+    </div>
+
+    ${
+      rows.length
+        ? `
+    <div class="section-block">
+      <div class="section-label">③ 인식된 품목 확인 (${rows.length}건 · 제품 매칭 ${matchedCount}/${rows.length})</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>품번(바코드)</th>
+              <th>제품 매칭</th>
+              <th>규격</th>
+              <th>단위</th>
+              <th>납기일자</th>
+              <th>발주수량</th>
+              <th>단가</th>
+              <th>금액</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="po-review-body">
+            ${rows.map((r, i) => renderPoRow(r, i)).join("")}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="7" style="text-align:right;font-weight:700">합계</td>
+              <td class="total-row" id="po-total-amount">${formatMoney(totalAmount, channel)}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+        <button class="btn btn-secondary" id="po-btn-add-row">+ 행 추가</button>
+        <button class="btn btn-success btn-lg" id="po-btn-save">💾 저장하고 영업 현황 반영</button>
+      </div>
+    </div>
+    `
+        : ""
+    }
+  `;
+}
+
+function handlePoFile(file) {
+  poUploadState.fileName = file.name;
+  poUploadState.status = "parsing";
+  poUploadState.statusMsg = "";
+  poUploadState.warning = "";
+  const isImage = file.type.startsWith("image/");
+  poUploadState.fileKind = isImage ? "image" : "excel";
+  render();
+
+  const applyParsed = (parsed) => {
+    const products = getProducts(appData);
+    poUploadState.rows = matchPoRowsToProducts(parsed.rows, products);
+    if (parsed.poNumber && !poUploadState.poNumber) poUploadState.poNumber = parsed.poNumber;
+    if (parsed.poDate) poUploadState.poDate = parsed.poDate;
+    poUploadState.warning = parsed.warning || "";
+    poUploadState.status = "done";
+    poUploadState.statusMsg = "";
+    render();
+  };
+
+  const onFail = (err) => {
+    poUploadState.status = "error";
+    poUploadState.statusMsg = err.message || "파일을 인식하지 못했습니다.";
+    render();
+  };
+
+  if (isImage) {
+    parsePoImageFile(file, (m) => {
+      if (m.status && m.progress != null) {
+        poUploadState.statusMsg = `OCR 인식 중... (${m.status} ${Math.round(m.progress * 100)}%)`;
+        const statusEl = document.querySelector(".po-status-parsing");
+        if (statusEl) statusEl.textContent = poUploadState.statusMsg;
+      }
+    })
+      .then(applyParsed)
+      .catch(onFail);
+  } else {
+    parsePoExcelFile(file).then(applyParsed).catch(onFail);
+  }
+}
+
+function updatePoTotals() {
+  const channel = findChannel(poUploadState.channelId);
+  const totalAmount = poUploadState.rows.reduce((s, r) => s + (r.amount ?? 0), 0);
+  const el = document.getElementById("po-total-amount");
+  if (el) el.textContent = formatMoney(totalAmount, channel);
+}
+
+function savePoUpload() {
+  if (!poUploadState.clientName.trim()) {
+    const select = document.getElementById("po-client-select");
+    if (select?.value) poUploadState.clientName = select.value;
+  }
+  if (!poUploadState.clientName.trim()) {
+    showToast("업체를 선택하거나 + 신규로 등록해주세요");
+    return;
+  }
+  if (!poUploadState.rows.length) {
+    showToast("인식된 품목이 없습니다. 파일을 업로드해주세요");
+    return;
+  }
+  const unmatched = poUploadState.rows.filter((r) => !r.matchedCode);
+  if (unmatched.length) {
+    showToast(`제품 매칭이 안 된 품목이 ${unmatched.length}건 있습니다. 매칭 후 저장해주세요`);
+    return;
+  }
+
+  const channel = findChannel(poUploadState.channelId);
+  const terms = getChannelTerms(appData, poUploadState.channelId);
+  const products = getProducts(appData);
+  const items = poUploadState.rows.map((r) => {
+    const product = products.find((p) => p.code === r.matchedCode);
+    const qty = r.qty ?? 0;
+    const amount = r.amount ?? (r.unitPrice != null ? r.unitPrice * qty : 0);
+    return {
+      productCode: r.matchedCode,
+      nameKor: product?.nameKor || r.name,
+      srpKrw: channel.currency === "KRW" ? r.unitPrice : null,
+      srpUsd: channel.currency === "USD" ? r.unitPrice : null,
+      fobRate: 0,
+      fobUsd: null,
+      fobKrw: null,
+      poQty: qty,
+      amount,
+    };
+  });
+  const totalAmount = items.reduce((s, i) => s + i.amount, 0);
+
+  const version = saveProposal(appData, {
+    channelId: poUploadState.channelId,
+    clientName: poUploadState.clientName,
+    poDate: poUploadState.poDate,
+    poNumber: poUploadState.poNumber,
+    fobRate: 0,
+    exchangeRate: appData.exchangeRate,
+    items,
+    totalAmount,
+    terms,
+    source: "po-upload",
+    sourceFileName: poUploadState.fileName,
+  });
+
+  showToast(`발주서가 저장되었습니다 — v${version}`);
+  poUploadState = freshPoUploadState();
+  setView("sales");
+}
+
+function bindPoUploadEvents() {
+  document.getElementById("po-channel-select").addEventListener("change", (e) => {
+    poUploadState.channelId = e.target.value;
+    poUploadState.clientName = "";
+    render();
+  });
+
+  const clientSelect = document.getElementById("po-client-select");
+  if (clientSelect) {
+    clientSelect.addEventListener("change", (e) => {
+      poUploadState.clientName = e.target.value;
+    });
+  }
+
+  document.getElementById("po-btn-quick-client")?.addEventListener("click", () => {
+    openAddClientModal(poUploadState.channelId, ({ name, channelId }) => {
+      poUploadState.channelId = channelId;
+      poUploadState.clientName = name;
+      render();
+    });
+  });
+
+  document.getElementById("po-date").addEventListener("change", (e) => {
+    poUploadState.poDate = e.target.value;
+  });
+  document.getElementById("po-number").addEventListener("input", (e) => {
+    poUploadState.poNumber = e.target.value;
+  });
+
+  const dropzone = document.getElementById("po-dropzone");
+  const fileInput = document.getElementById("po-file-input");
+  dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    const file = e.dataTransfer.files?.[0];
+    if (file) handlePoFile(file);
+  });
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (file) handlePoFile(file);
+  });
+
+  document.querySelectorAll("[data-po-field]").forEach((el) => {
+    const evt = el.tagName === "SELECT" ? "change" : "input";
+    el.addEventListener(evt, (e) => {
+      const idx = parseInt(e.target.dataset.rowIndex, 10);
+      const field = e.target.dataset.poField;
+      const row = poUploadState.rows[idx];
+      if (!row) return;
+      if (field === "matchedCode") {
+        row.matchedCode = e.target.value || null;
+        const product = getProducts(appData).find((p) => p.code === row.matchedCode);
+        row.matchedName = product ? product.nameKor : null;
+        render();
+        return;
+      }
+      if (field === "qty" || field === "unitPrice" || field === "amount") {
+        row[field] = parseOptionalNumber(e.target.value);
+        updatePoTotals();
+        return;
+      }
+      row[field] = e.target.value;
+    });
+  });
+
+  document.querySelectorAll("[data-po-remove-row]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.poRemoveRow, 10);
+      poUploadState.rows.splice(idx, 1);
+      render();
+    });
+  });
+
+  document.getElementById("po-btn-add-row")?.addEventListener("click", () => {
+    poUploadState.rows.push({
+      barcode: "",
+      name: "",
+      spec: "",
+      unit: "",
+      dueDate: "",
+      qty: null,
+      unitPrice: null,
+      amount: null,
+      amountVat: null,
+      matchedCode: null,
+      matchedName: null,
+    });
+    render();
+  });
+
+  document.getElementById("po-btn-save")?.addEventListener("click", savePoUpload);
 }
 
 function renderProducts() {
@@ -935,6 +1400,144 @@ function bindProductEvents() {
   });
 }
 
+function renderChannels() {
+  const channels = getChannelList();
+
+  return `
+    <div class="help-box no-print">
+      <span class="help-icon">🌐</span>
+      <div>판매 채널을 등록하면 <strong>단가표 만들기</strong>, <strong>소비자가 설정</strong>, <strong>거래 조건</strong> 등에 자동으로 반영됩니다.
+        업체나 단가표가 연결된 채널은 삭제할 수 없습니다.</div>
+    </div>
+    <div class="card no-print">
+      <div class="card-title">신규 채널 추가</div>
+      <form id="add-channel-form">
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label>채널 코드 *</label>
+            <input type="text" name="id" placeholder="예: JP, EU-UK" required pattern="[A-Za-z0-9-]+" title="영문, 숫자, 하이픈">
+            <span class="field-hint">영문·숫자·하이픈 (저장 시 대문자로 변환)</span>
+          </div>
+          <div class="form-group">
+            <label>채널명 *</label>
+            <input type="text" name="name" placeholder="예: 일본, 동남아" required>
+          </div>
+          <div class="form-group">
+            <label>통화 *</label>
+            <select name="currency" required>
+              <option value="USD">USD ($) — 해외</option>
+              <option value="KRW">KRW (₩) — 국내</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>기본 FOB 비율 (%) *</label>
+            <input type="number" name="defaultFobRate" value="30" min="1" max="100" step="0.1" required>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <button type="submit" class="btn btn-primary btn-lg">+ 채널 추가</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-title">등록된 채널 (${channels.length}개)</div>
+      ${
+        channels.length === 0
+          ? `<div class="empty-state"><div class="empty-icon">🌐</div>등록된 채널이 없습니다.</div>`
+          : `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>채널</th>
+              <th>코드</th>
+              <th>통화</th>
+              <th>기본 FOB</th>
+              <th>등록 업체</th>
+              <th>단가표</th>
+              <th class="no-print"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${channels
+              .map((ch) => {
+                const usage = getChannelUsage(appData, ch.id);
+                return `
+              <tr>
+                <td>${channelBadge(ch.id)} <strong>${ch.name}</strong></td>
+                <td><code>${ch.id}</code></td>
+                <td>${ch.currency}</td>
+                <td>${Math.round(ch.defaultFobRate * 100)}%</td>
+                <td>${usage.clients}개</td>
+                <td>${usage.proposals}건</td>
+                <td class="no-print">
+                  <button class="btn btn-danger btn-sm" data-delete-channel="${ch.id}" data-channel-name="${ch.name}" data-client-count="${usage.clients}" data-proposal-count="${usage.proposals}">삭제</button>
+                </td>
+              </tr>`;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </div>`
+      }
+    </div>
+  `;
+}
+
+function bindChannelEvents() {
+  const form = document.getElementById("add-channel-form");
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const result = addChannel(appData, {
+        id: fd.get("id"),
+        name: fd.get("name"),
+        currency: fd.get("currency"),
+        defaultFobRate: fd.get("defaultFobRate"),
+      });
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      showToast("채널이 등록되었습니다");
+      form.reset();
+      render();
+    });
+  }
+
+  document.querySelectorAll("[data-delete-channel]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const channelId = btn.dataset.deleteChannel;
+      const name = btn.dataset.channelName;
+      const clientCount = parseInt(btn.dataset.clientCount, 10);
+      const proposalCount = parseInt(btn.dataset.proposalCount, 10);
+      const detail = [`채널: ${name}`, `코드: ${channelId}`];
+      if (clientCount > 0) detail.push(`등록 업체: ${clientCount}개`);
+      if (proposalCount > 0) detail.push(`단가표: ${proposalCount}건`);
+      if (clientCount > 0 || proposalCount > 0) {
+        detail.push("※ 연결된 데이터가 있어 삭제할 수 없습니다");
+        showToast("업체나 단가표가 연결된 채널은 삭제할 수 없습니다");
+        return;
+      }
+      if (!(await confirmDelete("채널 삭제", detail.join("\n")))) return;
+      const result = deleteChannel(appData, channelId);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      if (proposalState.channelId === channelId) {
+        initProposalState(getChannelList()[0]?.id);
+      }
+      if (termsChannelId === channelId) {
+        termsChannelId = getChannelList()[0]?.id || "";
+      }
+      showToast(`채널 "${name}" 삭제됨`);
+      render();
+    });
+  });
+}
+
 function renderClients() {
   const clients = getClients(appData);
   const filterChannel = document.getElementById("client-filter")?.value || clientFilter || "";
@@ -943,17 +1546,19 @@ function renderClients() {
   return `
     <div class="help-box no-print">
       <span class="help-icon">🏢</span>
-      <div>거래처(업체)를 등록해 두면 <strong>단가표 만들기</strong>에서 목록으로 선택할 수 있습니다. 삭제해도 기존 단가표 이력은 유지됩니다.</div>
+      <div>거래처(업체)를 등록해 두면 <strong>단가표 만들기</strong>에서 목록으로 선택할 수 있습니다.
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-left:8px" onclick="openAddClientModal('')">+ 빠른 등록</button>
+      </div>
     </div>
     <div class="card no-print">
       <div class="card-title">신규 업체 추가</div>
       <form id="add-client-form">
-        <div class="form-grid" style="grid-template-columns:repeat(2,1fr)">
+        <div class="form-grid form-grid-2">
           <div class="form-group">
-            <label>채널 *</label>
+            <label>판매 채널 *</label>
             <select name="channelId" required>
               <option value="">채널 선택</option>
-              ${CHANNELS.map((ch) => `<option value="${ch.id}">${ch.name}</option>`).join("")}
+              ${renderChannelOptions("")}
             </select>
           </div>
           <div class="form-group">
@@ -981,10 +1586,12 @@ function renderClients() {
           <label>채널 필터</label>
           <select id="client-filter">
             <option value="">전체 채널</option>
-            ${CHANNELS.map(
-              (ch) =>
-                `<option value="${ch.id}" ${filterChannel === ch.id ? "selected" : ""}>${ch.name}</option>`
-            ).join("")}
+            ${getChannelList()
+              .map(
+                (ch) =>
+                  `<option value="${ch.id}" ${filterChannel === ch.id ? "selected" : ""}>${ch.name}</option>`
+              )
+              .join("")}
           </select>
         </div>
       </div>
@@ -1093,11 +1700,11 @@ function renderSrpMatrix() {
             <tr>
               <th rowspan="2">제품코드</th>
               <th rowspan="2">제품명</th>
-              ${CHANNELS.map((ch) => `<th colspan="2">${ch.name}</th>`).join("")}
+              ${getChannelList().map((ch) => `<th colspan="2">${ch.name}</th>`).join("")}
               <th rowspan="2" class="no-print">삭제</th>
             </tr>
             <tr>
-              ${CHANNELS.map(() => `<th>SRP (₩)</th><th>SRP ($)</th>`).join("")}
+              ${getChannelList().map(() => `<th>SRP (₩)</th><th>SRP ($)</th>`).join("")}
             </tr>
           </thead>
           <tbody>
@@ -1106,7 +1713,7 @@ function renderSrpMatrix() {
               <tr>
                 <td><code>${p.code}</code></td>
                 <td>${p.nameKor}</td>
-                ${CHANNELS.map((ch) => {
+                ${getChannelList().map((ch) => {
                   const srp = getChannelSrp(appData, p.code, ch.id);
                   return `
                   <td>
@@ -1192,7 +1799,7 @@ function renderHistory() {
           <label>채널 필터</label>
           <select id="history-filter">
             <option value="">전체</option>
-            ${CHANNELS.map((ch) => `<option value="${ch.id}">${ch.name}</option>`).join("")}
+            ${getChannelList().map((ch) => `<option value="${ch.id}">${ch.name}</option>`).join("")}
           </select>
         </div>
       </div>
@@ -1212,7 +1819,7 @@ function renderHistory() {
         <label>채널 필터</label>
         <select id="history-filter">
           <option value="">전체</option>
-          ${CHANNELS.map(
+          ${getChannelList().map(
             (ch) =>
               `<option value="${ch.id}" ${filterChannel === ch.id ? "selected" : ""}>${ch.name}</option>`
           ).join("")}
@@ -1223,11 +1830,12 @@ function renderHistory() {
       <div class="card-title">저장된 단가표 (${proposals.length}건)</div>
       ${proposals
         .map((p) => {
-          const ch = CHANNELS.find((c) => c.id === p.channelId);
+          const ch = getChannelList().find((c) => c.id === p.channelId);
           return `
           <div class="history-item">
             <div class="history-meta">
               ${channelBadge(p.channelId)}
+              ${p.source === "po-upload" ? `<span class="badge badge-default">발주서</span>` : ""}
               <span class="version">v${p.version}</span>
               <span>${p.clientName}</span>
               <span class="date">${p.poDate} · FOB ${p.fobRate}%</span>
@@ -1258,7 +1866,7 @@ function bindHistoryEvents() {
     btn.addEventListener("click", (e) => {
       const proposal = getProposalById(appData, e.target.dataset.viewId);
       if (!proposal) return;
-      const ch = CHANNELS.find((c) => c.id === proposal.channelId);
+      const ch = getChannelList().find((c) => c.id === proposal.channelId);
       const detail = document.getElementById("history-detail");
       detail.innerHTML = `
         <div class="card" style="margin-top:20px">
@@ -1469,7 +2077,7 @@ function bindSalesEvents() {
         (c) => c.channelId === channelId && c.clientName === clientName
       );
       if (!client) return;
-      const ch = CHANNELS.find((c) => c.id === channelId);
+      const ch = getChannelList().find((c) => c.id === channelId);
       const detail = document.getElementById("sales-detail");
       detail.innerHTML = `
         <div class="card" style="margin-top:20px">
@@ -1509,7 +2117,7 @@ function bindSalesEvents() {
 }
 
 function renderTerms() {
-  const channel = CHANNELS.find((c) => c.id === termsChannelId);
+  const channel = getChannelList().find((c) => c.id === termsChannelId);
   const terms = getChannelTerms(appData, termsChannelId);
   return `
     <div class="help-box no-print">
@@ -1522,10 +2130,7 @@ function renderTerms() {
         <div class="form-group">
           <label>채널 선택</label>
           <select id="terms-channel-select">
-            ${CHANNELS.map(
-              (ch) =>
-                `<option value="${ch.id}" ${ch.id === termsChannelId ? "selected" : ""}>${ch.name}</option>`
-            ).join("")}
+            ${renderChannelOptions(termsChannelId)}
           </select>
         </div>
       </div>
@@ -1566,15 +2171,15 @@ function bindTermsEvents() {
   });
 
   document.getElementById("btn-reset-terms").addEventListener("click", async () => {
-    const channel = CHANNELS.find((c) => c.id === termsChannelId);
+    const channel = findChannel(termsChannelId);
     if (!(await confirmRestore("거래 조건 복원", `채널: ${channel.name}`))) return;
-    setChannelTerms(appData, termsChannelId, [...channel.terms]);
+    setChannelTerms(appData, termsChannelId, getDefaultChannelTerms(appData, termsChannelId));
     showToast("기본값으로 복원됨");
     render();
   });
 
   document.getElementById("btn-clear-terms").addEventListener("click", async () => {
-    const channel = CHANNELS.find((c) => c.id === termsChannelId);
+    const channel = getChannelList().find((c) => c.id === termsChannelId);
     if (!(await confirmDelete("거래 조건 삭제", `채널: ${channel.name}\n※ 모든 거래 조건 항목이 삭제됩니다`))) return;
     clearChannelTerms(appData, termsChannelId);
     showToast("거래 조건이 삭제되었습니다");
@@ -1590,6 +2195,7 @@ function openProposal(channelId) {
 document.addEventListener("DOMContentLoaded", () => {
   initProposalState("CN");
   setupGlobalDeleteHandlers();
+  setupClientModal();
 
   document.querySelectorAll(".nav-item").forEach((btn) => {
     btn.addEventListener("click", () => setView(btn.dataset.view));
