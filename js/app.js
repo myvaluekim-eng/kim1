@@ -299,12 +299,21 @@ function setView(view) {
   document.querySelectorAll(".nav-item").forEach((el) => {
     el.classList.toggle("active", el.dataset.view === view);
   });
-  const meta = PAGE_META[view];
+  const meta = PAGE_META[view] || { title: "바를 영업관리", desc: "" };
   document.getElementById("page-title").textContent = meta.title;
   document.getElementById("page-desc").textContent = meta.desc;
   document.getElementById("sidebar")?.classList.remove("open");
   document.getElementById("sidebar-overlay")?.classList.remove("open");
-  render();
+  try {
+    render();
+  } catch (err) {
+    console.error(err);
+    const content = document.getElementById("content");
+    if (content) {
+      content.innerHTML = `<div class="card"><div class="empty-state">화면을 불러오지 못했습니다. Cmd+Shift+R로 새로고침해주세요.</div></div>`;
+    }
+    showToast("화면 로딩 오류 — 새로고침 해주세요");
+  }
 }
 
 function render() {
@@ -1884,7 +1893,7 @@ function renderMasterChannelDetail(channelId) {
                 <td>${orderCount > 0 ? `<span class="count-badge">${orderCount}건</span>` : "—"}</td>
                 <td class="master-row-actions">
                   <button type="button" class="btn btn-secondary btn-sm" data-edit-client="${c.id}">수정</button>
-                  <button type="button" class="btn btn-danger btn-sm" data-delete-client="${c.id}" data-client-name="${c.name}" data-proposal-count="${count}">삭제</button>
+                  <button type="button" class="btn btn-danger btn-sm" data-delete-client="${c.id}" data-client-name="${c.name}" data-proposal-count="${quoteCount}">삭제</button>
                 </td>
               </tr>`;
               })
