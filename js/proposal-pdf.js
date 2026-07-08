@@ -176,17 +176,51 @@ function buildProposalDocumentHtml(proposal) {
 
   return `
     <div class="proposal-doc proposal-doc--plain">
-      <div class="proposal-doc-title">
-        <h1>PRODUCT &amp; PRICE LIST</h1>
-        <p>Barle Cosmetics</p>
-      </div>
-
-      <div class="proposal-doc-info">
-        <p>Buyer: ${proposal.clientName} &nbsp;|&nbsp; Date: ${proposal.poDate || "—"} &nbsp;|&nbsp; Market: ${channel?.name || "—"} &nbsp;|&nbsp; Ver. ${proposal.version}</p>
-        <p>FOB ${proposal.fobRate}% &nbsp;|&nbsp; Exchange 1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")} &nbsp;|&nbsp; Total: ${formatMoney(totals.totalAmount, channel)}</p>
-      </div>
-
       <table class="proposal-doc-table">
+        <colgroup>
+          <col class="col-cat">
+          <col class="col-product">
+          <col class="col-code">
+          <col class="col-size">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-moq">
+          <col class="col-qty">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-amount">
+        </colgroup>
+        <tbody class="proposal-doc-head">
+          <tr class="proposal-doc-head-title">
+            <td colspan="13">PRODUCT &amp; PRICE LIST</td>
+          </tr>
+          <tr class="proposal-doc-head-sub">
+            <td colspan="13">Barle Cosmetics</td>
+          </tr>
+          <tr class="proposal-doc-meta-row">
+            <td class="meta-label">Buyer</td>
+            <td colspan="3">${proposal.clientName}</td>
+            <td class="meta-label">Date</td>
+            <td colspan="2">${proposal.poDate || "—"}</td>
+            <td class="meta-label">Market</td>
+            <td colspan="2">${channel?.name || "—"}</td>
+            <td class="meta-label">Ver.</td>
+            <td colspan="2">${proposal.version}</td>
+          </tr>
+          <tr class="proposal-doc-meta-row">
+            <td class="meta-label">FOB</td>
+            <td colspan="2">${proposal.fobRate}%</td>
+            <td class="meta-label">Exchange</td>
+            <td colspan="3">1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")}</td>
+            <td class="meta-label">Total</td>
+            <td colspan="5">${formatMoney(totals.totalAmount, channel)}</td>
+          </tr>
+          <tr class="proposal-doc-spacer">
+            <td colspan="13"></td>
+          </tr>
+        </tbody>
         <thead>
           <tr>
             <th>Category</th>
