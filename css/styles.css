@@ -1386,7 +1386,13 @@ td.total-row {
   .content { padding: 0; max-width: none; }
 }
 
-/* ── Master: 채널·업체·거래조건 통합 ── */
+.sidebar-help .app-version {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
 .master-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
