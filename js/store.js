@@ -359,6 +359,18 @@ function filterProposalsByMonth(proposals, yearMonth) {
   return proposals.filter((p) => getProposalDate(p).startsWith(yearMonth));
 }
 
+function getProposalCurrency(proposal, channel) {
+  if (proposal.priceCurrency === "KRW" || proposal.priceCurrency === "USD") {
+    return proposal.priceCurrency;
+  }
+  const items = proposal.items || [];
+  const hasKrw = items.some((i) => i.srpKrw != null && i.srpKrw > 0);
+  const hasUsd = items.some((i) => i.srpUsd != null && i.srpUsd > 0);
+  if (hasKrw && !hasUsd) return "KRW";
+  if (hasUsd && !hasKrw) return "USD";
+  return channel?.currency || "USD";
+}
+
 function buildSalesSummary(data, yearMonth) {
   const proposals = filterProposalsByMonth(getOrders(data), yearMonth);
   const clientMap = {};
@@ -370,7 +382,7 @@ function buildSalesSummary(data, yearMonth) {
       clientMap[key] = {
         channelId: p.channelId,
         channelName: ch?.name || p.channelId,
-        currency: ch?.currency || "USD",
+        currency: getProposalCurrency(p, ch),
         clientName: p.clientName,
         count: 0,
         totalAmount: 0,

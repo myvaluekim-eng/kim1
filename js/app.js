@@ -202,6 +202,22 @@ function formatMoney(value, channel) {
   return formatUsd(value);
 }
 
+function formatByCurrency(value, currency) {
+  if (value == null) return "—";
+  if (currency === "KRW") return formatKrw(value);
+  return formatUsd(value);
+}
+
+function formatProposalMoney(value, proposal, channel) {
+  return formatByCurrency(value, getProposalCurrency(proposal, channel));
+}
+
+function formatProposalUnitPrice(item, proposal, channel) {
+  const currency = getProposalCurrency(proposal, channel);
+  if (currency === "KRW") return formatKrw(item.srpKrw ?? 0);
+  return formatUsd(item.srpUsd ?? 0);
+}
+
 function formatNumber(value, decimals = 2) {
   return Number(value).toFixed(decimals);
 }
@@ -1518,6 +1534,7 @@ function savePoUpload() {
     poNumber: poUploadState.poNumber,
     fobRate: 0,
     exchangeRate: appData.exchangeRate,
+    priceCurrency: poUploadState.mode === "manual" ? poUploadState.manualPriceCurrency : channel.currency,
     items,
     totalAmount,
     terms,
@@ -2638,7 +2655,7 @@ function bindSalesEvents() {
                 <span class="version">v${p.version}</span>
                 <span class="date">${p.poDate}</span>
                 ${p.poNumber ? `<span>발주번호 ${p.poNumber}</span>` : ""}
-                <span class="date">${formatMoney(p.totalAmount, ch)}</span>
+                <span class="date">${formatProposalMoney(p.totalAmount, p, ch)}</span>
               </div>
               <div class="history-actions no-print">
                 <button class="btn btn-secondary btn-sm" data-view-proposal="${p.id}">보기</button>
@@ -2677,14 +2694,14 @@ function bindSalesEvents() {
                         <td><code>${item.productCode}</code></td>
                         <td>${item.nameKor}</td>
                         <td>${item.poQty}</td>
-                        <td>${formatMoney(item.srpKrw ?? item.srpUsd ?? 0, ch)}</td>
-                        <td>${formatMoney(item.amount, ch)}</td>
+                        <td>${formatProposalUnitPrice(item, proposal, ch)}</td>
+                        <td>${formatProposalMoney(item.amount, proposal, ch)}</td>
                       </tr>`).join("")}
                   </tbody>
                   <tfoot>
                     <tr>
                       <td colspan="4" style="text-align:right;font-weight:700">Total</td>
-                      <td class="total-row">${formatMoney(proposal.totalAmount, ch)}</td>
+                      <td class="total-row">${formatProposalMoney(proposal.totalAmount, proposal, ch)}</td>
                     </tr>
                   </tfoot>
                 </table>
