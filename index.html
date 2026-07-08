@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>바를 영업 관리</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-mark">B</div>
+        <div>
+          <h1>바를 영업관리</h1>
+          <span>Barle Cosmetics</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <p class="nav-section-label">자주 쓰는 메뉴</p>
+          <button class="nav-item active" data-view="dashboard">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-text">
+              <strong>시작하기</strong>
+              <small>업무 선택 및 안내</small>
+            </span>
+          </button>
+          <button class="nav-item" data-view="proposal">
+            <span class="nav-icon">📋</span>
+            <span class="nav-text">
+              <strong>단가표 만들기</strong>
+              <small>업체에 보낼 가격표 작성</small>
+            </span>
+          </button>
+          <button class="nav-item" data-view="history">
+            <span class="nav-icon">🕐</span>
+            <span class="nav-text">
+              <strong>지난 단가표</strong>
+              <small>저장된 가격표 다시 보기</small>
+            </span>
+          </button>
+          <button class="nav-item" data-view="sales">
+            <span class="nav-icon">📈</span>
+            <span class="nav-text">
+              <strong>영업 현황</strong>
+              <small>업체별·월별 발주 한눈에</small>
+            </span>
+          </button>
+        </div>
+
+        <div class="nav-section">
+          <p class="nav-section-label">데이터 관리</p>
+          <button class="nav-item" data-view="products">
+            <span class="nav-icon">📦</span>
+            <span class="nav-text">
+              <strong>제품 등록</strong>
+              <small>신규 제품 추가·삭제</small>
+            </span>
+          </button>
+          <button class="nav-item" data-view="clients">
+            <span class="nav-icon">🏢</span>
+            <span class="nav-text">
+              <strong>업체 등록</strong>
+              <small>거래처 추가·삭제</small>
+            </span>
+          </button>
+          <button class="nav-item" data-view="srp">
+            <span class="nav-icon">💰</span>
+            <span class="nav-text">
+              <strong>소비자가 설정</strong>
+              <small>채널별 권장 소비자가</small>
+            </span>
+          </button>
+        </div>
+
+        <div class="nav-section">
+          <p class="nav-section-label">설정</p>
+          <button class="nav-item" data-view="terms">
+            <span class="nav-icon">📝</span>
+            <span class="nav-text">
+              <strong>거래 조건</strong>
+              <small>채널별 약관(T&C) 수정</small>
+            </span>
+          </button>
+        </div>
+      </nav>
+
+      <div class="sidebar-help">
+        <p><strong>💡 도움말</strong></p>
+        <p>노란 칸은 직접 입력, 파란 칸은 자동 계산됩니다.</p>
+      </div>
+    </aside>
+
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="menu-toggle no-print" id="menu-toggle" aria-label="메뉴 열기">☰</button>
+          <div>
+            <h2 id="page-title">시작하기</h2>
+            <p id="page-desc">업무를 선택하세요.</p>
+          </div>
+        </div>
+        <span class="topbar-brand no-print">Barle Cosmetics</span>
+      </header>
+      <div class="content" id="content"></div>
+    </div>
+
+    <div class="confirm-overlay" id="confirm-overlay" hidden>
+      <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div class="confirm-header" id="confirm-header">
+          <span class="confirm-icon" id="confirm-icon">⚠️</span>
+          <div>
+            <p class="confirm-label" id="confirm-label">삭제 확인</p>
+            <h3 class="confirm-title" id="confirm-title">항목 삭제</h3>
+          </div>
+        </div>
+        <div class="confirm-body">
+          <ul class="confirm-details" id="confirm-details"></ul>
+          <p class="confirm-warning" id="confirm-warning">삭제하면 되돌릴 수 없습니다.</p>
+        </div>
+        <div class="confirm-actions">
+          <button type="button" class="btn btn-secondary btn-lg" id="confirm-cancel">취소</button>
+          <button type="button" class="btn btn-lg" id="confirm-ok">삭제하기</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/excel.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
