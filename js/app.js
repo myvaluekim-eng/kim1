@@ -634,7 +634,7 @@ function renderProposal() {
       <div class="section-label">① 기본 정보 입력</div>
       <div class="proposal-meta-panel">
         <div class="form-group">
-          <label>판매 채널</label>
+          <label>판매 국가</label>
           <select id="channel-select">
             ${renderChannelOptions(proposalState.channelId)}
           </select>
