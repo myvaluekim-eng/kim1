@@ -3,9 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>재고 관리</title>
+    <title>바를 영업 관리</title>
   </head>
   <body>
-    <h1>재고 관리</h1>
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <h1>Barle Sales</h1>
+        <span>채널별 영업 관리</span>
+      </div>
+      <nav>
+        <button class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">📊</span> 대시보드
+        </button>
+        <button class="nav-item" data-view="proposal">
+          <span class="nav-icon">📋</span> 제안 단가표
+        </button>
+        <button class="nav-item" data-view="products">
+          <span class="nav-icon">📦</span> 제품 마스터
+        </button>
+        <button class="nav-item" data-view="srp">
+          <span class="nav-icon">💰</span> 채널별 SRP
+        </button>
+        <button class="nav-item" data-view="history">
+          <span class="nav-icon">🕐</span> 제안 이력
+        </button>
+      </nav>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <h2 id="page-title">대시보드</h2>
+        <span style="font-size:13px;color:var(--text-muted)">Barle Cosmetics</span>
+      </header>
+      <div class="content" id="content"></div>
+    </div>
   </body>
 </html>
+
