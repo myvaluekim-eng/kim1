@@ -1386,6 +1386,126 @@ td.total-row {
   .content { padding: 0; max-width: none; }
 }
 
+/* ── Master: 채널·업체·거래조건 통합 ── */
+.master-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.master-sidebar {
+  position: sticky;
+  top: 20px;
+  padding: 20px;
+}
+
+.master-channel-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.master-channel-item {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.master-channel-item:hover {
+  border-color: var(--primary);
+  background: var(--primary-light, #f0fdf4);
+}
+
+.master-channel-item.active {
+  border-color: var(--primary);
+  background: var(--primary-light, #ecfdf5);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.master-channel-name {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.master-channel-meta {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.master-new-btn {
+  width: 100%;
+}
+
+.master-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.master-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.master-client-form {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.master-row-actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.master-terms-preview {
+  margin-top: 16px;
+}
+
+.master-terms-preview h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.form-grid-full {
+  grid-column: 1 / -1;
+}
+
+.input-readonly {
+  background: var(--bg-muted, #f8fafc);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+tr.row-editing td {
+  background: #fffbeb;
+}
+
+.empty-state.compact {
+  padding: 24px 16px;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
 /* ── Responsive ── */
 @media (max-width: 1100px) {
   .action-grid { grid-template-columns: 1fr; }
@@ -1411,4 +1531,6 @@ td.total-row {
   .stats-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .proposal-meta-fields { grid-template-columns: 1fr; }
+  .master-layout { grid-template-columns: 1fr; }
+  .master-sidebar { position: static; }
 }

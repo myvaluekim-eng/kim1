@@ -164,9 +164,10 @@ function parsePoCoreLine(lineText) {
     .trim();
 
   if (name.length < 2 && !barcode) return null;
+  if (poIsTitleNoise(name) && !barcode) return null;
   if (qty == null && amount == null) return null;
 
-  return {
+  const row = {
     barcode,
     name,
     spec: specMatch ? specMatch[0].replace(/\s/g, "") : "",
@@ -177,6 +178,7 @@ function parsePoCoreLine(lineText) {
     amount,
     amountVat: amountVat ?? null,
   };
+  return poIsValidProductRow(row) ? row : null;
 }
 
 function poMergeMultilineRows(rawLines) {
@@ -233,6 +235,44 @@ function poFilterQtyNumbers(nums) {
   });
 }
 
+function poIsTitleNoise(name) {
+  const c = poCompact(name);
+  const raw = String(name || "").trim();
+  if (!c) return true;
+  if (/구매발주서|구매.*발주|발주서/.test(c)) return true;
+  if (/주식회사|홍천|플리에|귀중|사업장|대표자|전화|팩스|tel|fax/i.test(c)) return true;
+  if (/^구매|^발주|^매발주/.test(c)) return true;
+  if (/\bif\b/i.test(raw) && !/바를/.test(raw)) return true;
+  return false;
+}
+
+function poIsValidProductRow(row) {
+  if (!row || poIsTitleNoise(row.name)) return false;
+
+  const hasBarle = /바를/.test(row.name || "");
+  const hasBarcode = /^8800\d{9,}$/.test(String(row.barcode || ""));
+  if (!hasBarle && !hasBarcode) return false;
+
+  const qty = row.qty;
+  const unitPrice = row.unitPrice;
+  const amount = row.amount;
+  if (qty == null || amount == null) return false;
+  if (qty < 1 || qty > 500000) return false;
+  if (amount < 1000) return false;
+
+  if (unitPrice != null) {
+    if (unitPrice < 500 || unitPrice > 200000) return false;
+    const expected = qty * unitPrice;
+    if (expected > 0 && Math.abs(expected - amount) / expected > 0.12) return false;
+  }
+
+  return true;
+}
+
+function poFilterValidRows(rows) {
+  return (rows || []).filter(poIsValidProductRow);
+}
+
 function poNormalizeBarcode(raw) {
   const digits = String(raw || "").replace(/\D/g, "");
   if (digits.length >= 12 && digits.startsWith("8800")) return digits.slice(0, 13);
@@ -241,14 +281,19 @@ function poNormalizeBarcode(raw) {
 
 function parsePoByBarcodeBlocks(text) {
   const normalized = poNormalizeOcrText(text);
-  const chunks = normalized.split(/(?=\b8800[\d\s]{9,14}\b)/).filter(Boolean);
-  const rows = [];
+  const matches = [...normalized.matchAll(/8800\d{9}/g)];
+  if (!matches.length) return [];
 
-  for (const chunk of chunks) {
+  const rows = [];
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index;
+    const end = i + 1 < matches.length ? matches[i + 1].index : normalized.length;
+    const chunk = normalized.slice(start, end);
+    if (poIsSubtotalRow(chunk)) break;
     const row = parsePoCoreLine(chunk.trim());
-    if (row?.name) rows.push(row);
+    if (row) rows.push(row);
   }
-  return rows;
+  return poFilterValidRows(rows);
 }
 
 function parsePoFromOcrBlocks(text) {
@@ -264,7 +309,7 @@ function parsePoFromOcrBlocks(text) {
     if (!buffer.length) return;
     const combined = buffer.join(" ");
     const row = parsePoCoreLine(combined);
-    if (row?.name) rows.push(row);
+    if (row && poIsValidProductRow(row)) rows.push(row);
     buffer = [];
   };
 
@@ -273,31 +318,31 @@ function parsePoFromOcrBlocks(text) {
       flush();
       break;
     }
-    if (/8800[\d\s]{9,}/.test(line) && buffer.length) flush();
+    if (/8800\d{9}/.test(line) && buffer.length) flush();
 
     const isDataLine =
-      /8800[\d\s]{9,}/.test(line) ||
-      /바를|[가-힣]{2,}/.test(line) ||
+      /8800\d{9}/.test(line) ||
+      /바를/.test(line) ||
       /\d{4}-\d{1,2}-\d{1,2}/.test(line) ||
       /(\d{1,3}(?:,\d{3})+|\d{2,})/.test(line);
 
     if (isDataLine) buffer.push(line);
 
     const combined = buffer.join(" ");
-    const hasBarcode = /8800[\d\s]{9,}/.test(combined);
+    const hasBarcode = /8800\d{9}/.test(combined);
     const { nums } = poExtractNumbersFromTail(combined);
-    if (hasBarcode && nums.length >= 3 && /[가-힣]{2,}/.test(combined)) flush();
+    if (hasBarcode && nums.length >= 3 && /바를/.test(combined)) flush();
   }
   flush();
-  return rows;
+  return poFilterValidRows(rows);
 }
 
 function parsePoAllStrategies(text) {
   const normalized = poNormalizeOcrText(text);
   const strategies = [
-    () => parsePoCoreText(normalized),
     () => parsePoByBarcodeBlocks(normalized),
     () => parsePoFromOcrBlocks(normalized),
+    () => poFilterValidRows(parsePoCoreText(normalized)),
   ];
 
   let best = [];
@@ -324,8 +369,8 @@ function parsePoCoreText(text) {
     if (row) rows.push(row);
   }
 
-  if (rows.length) return rows;
-  return parsePoByBarcodeBlocks(normalized);
+  if (rows.length) return poFilterValidRows(rows);
+  return poFilterValidRows(parsePoByBarcodeBlocks(normalized));
 }
 
 function poNormalizeNameForMatch(name) {
@@ -429,6 +474,8 @@ function parsePoMatrix(matrix) {
   if (!rows.length) {
     rows = parsePoAllStrategies(allText);
   }
+
+  rows = poFilterValidRows(rows);
 
   return {
     poNumber: poExtractPoNumber(allText),
@@ -575,9 +622,11 @@ function parsePoTableFromOcrWords(words, fullText) {
 
   const flushPending = () => {
     if (!pending) return;
-    if (pending.name && (pending.qty != null || pending.amount != null)) rows.push(pending);
+    if (poIsValidProductRow(pending)) rows.push(pending);
     pending = null;
   };
+
+  let seenProduct = false;
 
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const lineText = lines[i].words.map((w) => w.text).join(" ");
@@ -585,8 +634,16 @@ function parsePoTableFromOcrWords(words, fullText) {
 
     const cols = poColumnTexts(lines[i].words, columns);
     const barcodeMatch = lineText.match(/8800\d{9,12}/);
-    const hasBarle = /바를/.test(lineText);
-    const isNewRow = /^[1-9]\s/.test(lineText) || barcodeMatch || (hasBarle && cols.name);
+    const hasBarle = /바를/.test(lineText) || /바를/.test(cols.name);
+
+    if (!seenProduct) {
+      if (!barcodeMatch && !hasBarle) continue;
+      seenProduct = true;
+    }
+
+    if (poIsTitleNoise(cols.name) && !hasBarle && !barcodeMatch) continue;
+
+    const isNewRow = /^[1-9]\s/.test(lineText) || barcodeMatch || hasBarle;
 
     if (isNewRow && pending) flushPending();
 
@@ -619,12 +676,13 @@ function parsePoTableFromOcrWords(words, fullText) {
   }
   flushPending();
 
-  if (!rows.length) return null;
+  const validRows = poFilterValidRows(rows);
+  if (!validRows.length) return null;
 
   return {
     poNumber: poExtractPoNumber(fullText),
     poDate: poExtractPoDate(fullText),
-    rows,
+    rows: validRows,
     isOliveYoung: isOliveYoungPoText(fullText),
     warning: "표 열(품명·발주수량·단가·금액) 기준으로 인식했습니다. 저장 전 확인해주세요.",
   };
@@ -677,6 +735,7 @@ function preprocessPoImageFile(file) {
 
 function poFinalizeParseResult(parsed, fullText) {
   parsed = parsed || parsePoFromPlainText(fullText);
+  parsed.rows = poFilterValidRows(parsed.rows);
   if (!parsed.rows.length) {
     const retry = parsePoAllStrategies(fullText);
     if (retry.length) parsed.rows = retry;
@@ -789,14 +848,18 @@ function parsePoFromOcrWords(words, fullText) {
     rows = parsePoAllStrategies(fullText);
   }
 
-  return {
-    poNumber: poExtractPoNumber(fullText),
-    poDate: poExtractPoDate(fullText),
-    rows,
-    isOliveYoung: isOliveYoungPoText(fullText),
-    warning: rows.length ? "OCR 인식 결과입니다. 품명·수량·단가·금액을 확인해주세요." : "자동 인식에 실패했습니다. 아래 표에 직접 입력하거나 엑셀 파일을 업로드해주세요.",
-    rawText: fullText,
-  };
+  return poFinalizeParseResult(
+    {
+      poNumber: poExtractPoNumber(fullText),
+      poDate: poExtractPoDate(fullText),
+      rows,
+      isOliveYoung: isOliveYoungPoText(fullText),
+      warning: rows.length
+        ? "OCR 인식 결과입니다. 품명·수량·단가·금액을 확인해주세요."
+        : "자동 인식에 실패했습니다. 아래 표에 직접 입력하거나 엑셀 파일을 업로드해주세요.",
+    },
+    fullText
+  );
 }
 
 function parsePoFromPlainText(text) {
@@ -822,12 +885,13 @@ function parsePoImageFile(file, onProgress) {
     const input = await preprocessPoImageFile(file);
     const logger = (m) => onProgress && onProgress(m);
 
-    async function runOcr(recognizeInput) {
+    async function runOcr(recognizeInput, psm) {
+      const psmMode = psm || Tesseract.PSM?.SINGLE_BLOCK || "6";
       try {
         const worker = await Tesseract.createWorker("kor+eng", 1, { logger });
         try {
           await worker.setParameters({
-            tessedit_pageseg_mode: Tesseract.PSM?.SINGLE_BLOCK || "6",
+            tessedit_pageseg_mode: psmMode,
             preserve_interword_spaces: "1",
           });
           return await worker.recognize(recognizeInput);
@@ -839,15 +903,43 @@ function parsePoImageFile(file, onProgress) {
       }
     }
 
-    const result = await runOcr(input);
-    const fullText = result.data.text || "";
-    const words = poExtractOcrWords(result.data) || [];
+    function parseOcrAttempt(result) {
+      const fullText = result.data.text || "";
+      const words = poExtractOcrWords(result.data) || [];
 
-    let parsed = null;
-    if (words.length) parsed = parsePoTableFromOcrWords(words, fullText);
-    if (!parsed?.rows?.length && words.length) parsed = parsePoFromOcrWords(words, fullText);
-    if (!parsed?.rows?.length) parsed = parsePoFromPlainText(fullText);
+      let parsed = null;
+      if (words.length) parsed = parsePoTableFromOcrWords(words, fullText);
+      if (!parsed?.rows?.length) {
+        const barcodeRows = parsePoByBarcodeBlocks(fullText);
+        if (barcodeRows.length) {
+          parsed = {
+            poNumber: poExtractPoNumber(fullText),
+            poDate: poExtractPoDate(fullText),
+            rows: barcodeRows,
+            isOliveYoung: isOliveYoungPoText(fullText),
+            warning: "바코드 기준으로 품목을 인식했습니다. 저장 전 확인해주세요.",
+          };
+        }
+      }
+      if (!parsed?.rows?.length && words.length) parsed = parsePoFromOcrWords(words, fullText);
+      if (!parsed?.rows?.length) parsed = parsePoFromPlainText(fullText);
+      return poFinalizeParseResult(parsed, fullText);
+    }
 
-    return poFinalizeParseResult(parsed, fullText);
+    const psmModes = [
+      Tesseract.PSM?.SINGLE_BLOCK || "6",
+      Tesseract.PSM?.SINGLE_COLUMN || "4",
+      Tesseract.PSM?.SPARSE_TEXT || "11",
+    ];
+
+    let best = null;
+    for (const psm of psmModes) {
+      const result = await runOcr(input, psm);
+      const parsed = parseOcrAttempt(result);
+      if (!best || parsed.rows.length > best.rows.length) best = parsed;
+      if (parsed.rows.length >= 1) break;
+    }
+
+    return best || parseOcrAttempt(await runOcr(input));
   })();
 }

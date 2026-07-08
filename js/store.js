@@ -164,6 +164,32 @@ function addChannel(data, channel) {
   return { ok: true };
 }
 
+function updateChannel(data, channelId, updates) {
+  const channels = getChannels(data);
+  const idx = channels.findIndex((c) => c.id === channelId);
+  if (idx === -1) return { ok: false, error: "채널을 찾을 수 없습니다." };
+
+  const name = updates.name?.trim();
+  if (!name) return { ok: false, error: "채널명을 입력해주세요." };
+
+  const currency = updates.currency === "KRW" ? "KRW" : "USD";
+  const fobPercent = parseFloat(updates.defaultFobRate);
+  const defaultFobRate = isNaN(fobPercent)
+    ? channels[idx].defaultFobRate
+    : fobPercent / 100;
+
+  channels[idx] = {
+    ...channels[idx],
+    name,
+    currency,
+    currencySymbol: currency === "KRW" ? "₩" : "$",
+    defaultFobRate,
+  };
+  data.channels = channels;
+  saveData(data);
+  return { ok: true };
+}
+
 function deleteChannel(data, channelId) {
   const channels = getChannels(data);
   if (channels.length <= 1) {
@@ -319,6 +345,41 @@ function addClient(data, client) {
     memo: client.memo?.trim() || "",
     createdAt: new Date().toISOString(),
   });
+  saveData(data);
+  return { ok: true };
+}
+
+function updateClient(data, clientId, updates) {
+  const client = (data.clients || []).find((c) => c.id === clientId);
+  if (!client) return { ok: false, error: "업체를 찾을 수 없습니다." };
+
+  const name = updates.name?.trim();
+  if (!name) return { ok: false, error: "업체명을 입력해주세요." };
+
+  const channelId = updates.channelId || client.channelId;
+  if (!channelId) return { ok: false, error: "채널을 선택해주세요." };
+
+  const duplicate = (data.clients || []).some(
+    (c) => c.id !== clientId && c.channelId === channelId && c.name === name
+  );
+  if (duplicate) return { ok: false, error: "같은 채널에 이미 등록된 업체입니다." };
+
+  const oldName = client.name;
+  const oldChannelId = client.channelId;
+
+  if (name !== oldName || channelId !== oldChannelId) {
+    data.proposals.forEach((p) => {
+      if (p.channelId === oldChannelId && p.clientName === oldName) {
+        p.channelId = channelId;
+        p.clientName = name;
+      }
+    });
+  }
+
+  client.name = name;
+  client.channelId = channelId;
+  client.contact = updates.contact?.trim() || "";
+  client.memo = updates.memo?.trim() || "";
   saveData(data);
   return { ok: true };
 }
