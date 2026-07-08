@@ -633,33 +633,35 @@ function renderProposal() {
     <div class="section-block no-print">
       <div class="section-label">① 기본 정보 입력</div>
       <div class="proposal-meta-panel">
-        <div class="form-group">
-          <label>판매 국가</label>
-          <select id="channel-select">
-            ${renderChannelOptions(proposalState.channelId)}
-          </select>
-        </div>
-        <div class="form-group form-group-client">
-          <label>업체명 <span class="required">*</span></label>
-          <div class="input-with-action">
-            <select id="client-select">
-              ${getClientSelectOptions(proposalState.channelId, proposalState.clientName)}
+        <div class="proposal-meta-fields">
+          <div class="form-group">
+            <label>판매 채널</label>
+            <select id="channel-select">
+              ${renderChannelOptions(proposalState.channelId)}
             </select>
-            <button type="button" class="btn btn-secondary" id="btn-quick-client">+ 신규</button>
           </div>
-          ${
-            channelClients.length === 0
-              ? `<span class="field-hint">등록된 업체가 없습니다. <strong>+ 신규</strong> 버튼으로 추가하세요.</span>`
-              : ""
-          }
+          <div class="form-group form-group-client">
+            <label>업체명 <span class="required">*</span></label>
+            <div class="input-with-action">
+              <select id="client-select">
+                ${getClientSelectOptions(proposalState.channelId, proposalState.clientName)}
+              </select>
+              <button type="button" class="btn btn-secondary btn-compact" id="btn-quick-client">+ 신규</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>작성일</label>
+            <input type="date" id="po-date" value="${proposalState.poDate}">
+          </div>
         </div>
-        <div class="form-group">
-          <label>작성일</label>
-          <input type="date" id="po-date" value="${proposalState.poDate}">
-        </div>
+        ${
+          channelClients.length === 0
+            ? `<p class="proposal-meta-hint">등록된 업체가 없습니다. <strong>+ 신규</strong> 버튼으로 추가하세요.</p>`
+            : ""
+        }
         <div class="proposal-meta-actions">
-          <button class="btn btn-secondary" id="btn-print">🖨 인쇄</button>
-          <button class="btn btn-success btn-lg" id="btn-save">💾 저장하기</button>
+          <button type="button" class="btn btn-secondary" id="btn-print">🖨 인쇄</button>
+          <button type="button" class="btn btn-success" id="btn-save">💾 저장하기</button>
         </div>
       </div>
     </div>
@@ -885,39 +887,89 @@ function updateProposalCalcs(channel) {
   if (totalCbmEl) totalCbmEl.textContent = formatNumber(totalCbm, 4);
 }
 
+function emptyPoRow() {
+  return {
+    barcode: "",
+    name: "",
+    spec: "",
+    unit: "",
+    dueDate: "",
+    qty: null,
+    unitPrice: null,
+    amount: null,
+    amountVat: null,
+    matchedCode: null,
+    matchedName: null,
+  };
+}
+
+function renderPoReviewSection(channel, rows) {
+  const totalAmount = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
+  return `
+    <div class="section-block">
+      <div class="section-label">③ ${rows.length ? `인식 결과 (${rows.length}건)` : "품목 입력"}</div>
+      <div class="table-wrap">
+        <table class="po-review-table">
+          <thead>
+            <tr>
+              <th>품명</th>
+              <th>발주수량</th>
+              <th>단가</th>
+              <th>금액</th>
+              <th class="no-print">제품 연결</th>
+              <th class="no-print"></th>
+            </tr>
+          </thead>
+          <tbody id="po-review-body">
+            ${rows.length ? rows.map((r, i) => renderPoRow(r, i)).join("") : `<tr><td colspan="6" class="po-empty-hint">+ 행 추가 버튼으로 품목을 입력하세요</td></tr>`}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" style="text-align:right;font-weight:700">합계</td>
+              <td class="total-row" id="po-total-amount">${formatMoney(totalAmount, channel)}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+        <button class="btn btn-secondary" id="po-btn-add-row">+ 행 추가</button>
+        <button class="btn btn-success btn-lg" id="po-btn-save">💾 저장하고 영업 현황 반영</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderPoRow(r, i) {
   const products = getProducts(appData);
   const matched = !!r.matchedCode;
   return `
     <tr data-row-index="${i}" class="${matched ? "" : "po-row-unmatched"}">
-      <td><code>${r.barcode || "-"}</code></td>
       <td class="editable">
-        <select class="input-cell" data-po-field="matchedCode" data-row-index="${i}">
-          <option value="">${matched ? "매칭 안됨으로 변경" : "-- 제품 선택 --"}</option>
+        <input class="input-cell po-name-input" type="text" data-po-field="name" data-row-index="${i}" value="${(r.name || "").replace(/"/g, "&quot;")}" placeholder="품명">
+      </td>
+      <td class="editable">
+        <input class="input-cell" type="number" step="1" min="0" data-po-field="qty" data-row-index="${i}" value="${r.qty ?? ""}" placeholder="0">
+      </td>
+      <td class="editable">
+        <input class="input-cell" type="number" step="1" min="0" data-po-field="unitPrice" data-row-index="${i}" value="${r.unitPrice ?? ""}" placeholder="0">
+      </td>
+      <td class="editable">
+        <input class="input-cell" type="number" step="1" min="0" data-po-field="amount" data-row-index="${i}" value="${r.amount ?? ""}" placeholder="0">
+      </td>
+      <td class="no-print po-match-cell">
+        <select class="input-cell" data-po-field="matchedCode" data-row-index="${i}" title="등록 제품 연결 (선택)">
+          <option value="">연결 안 함</option>
           ${products
             .map(
               (p) =>
-                `<option value="${p.code}" ${p.code === r.matchedCode ? "selected" : ""}>${p.nameKor} (${p.code})</option>`
+                `<option value="${p.code}" ${p.code === r.matchedCode ? "selected" : ""}>${p.nameKor}</option>`
             )
             .join("")}
         </select>
-        ${!matched ? `<span class="field-hint po-hint-warn">인식된 품명: ${r.name || "-"}</span>` : ""}
+        ${r.barcode ? `<span class="field-hint">${r.barcode}</span>` : ""}
       </td>
-      <td>${r.spec || "-"}</td>
-      <td>${r.unit || "-"}</td>
-      <td class="editable">
-        <input class="input-cell" type="date" data-po-field="dueDate" data-row-index="${i}" value="${r.dueDate || ""}">
-      </td>
-      <td class="editable">
-        <input class="input-cell" type="number" step="1" min="0" data-po-field="qty" data-row-index="${i}" value="${r.qty ?? ""}">
-      </td>
-      <td class="editable">
-        <input class="input-cell" type="number" step="1" min="0" data-po-field="unitPrice" data-row-index="${i}" value="${r.unitPrice ?? ""}">
-      </td>
-      <td class="editable">
-        <input class="input-cell" type="number" step="1" min="0" data-po-field="amount" data-row-index="${i}" value="${r.amount ?? ""}">
-      </td>
-      <td><button class="btn btn-danger btn-sm" data-po-remove-row="${i}">삭제</button></td>
+      <td class="no-print"><button class="btn btn-danger btn-sm" data-po-remove-row="${i}">삭제</button></td>
     </tr>
   `;
 }
@@ -927,14 +979,13 @@ function renderPoUpload() {
   const channelClients = getClients(appData, poUploadState.channelId);
   const rows = poUploadState.rows;
   const totalAmount = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
-  const matchedCount = rows.filter((r) => r.matchedCode).length;
 
   return `
     <div class="help-box no-print">
       <span class="help-icon">🧾</span>
       <div>
         <strong>발주서 업로드</strong><br>
-        엑셀 파일은 표를 자동으로 인식합니다. 이미지(사진·스캔본)는 OCR로 베타 인식하므로 저장 전 값을 꼭 확인해주세요.
+        올리브영 <strong>구매발주서</strong>에서 <strong>품명 · 발주수량 · 단가 · 금액</strong>을 자동 인식합니다.
       </div>
     </div>
 
@@ -973,7 +1024,7 @@ function renderPoUpload() {
     <div class="section-block no-print">
       <div class="section-label">② 발주서 파일 업로드</div>
       <div class="po-dropzone" id="po-dropzone">
-        <input type="file" id="po-file-input" accept=".xlsx,.xls,.csv,image/png,image/jpeg,image/jpg" hidden>
+        <input type="file" id="po-file-input" accept=".xlsx,.xls,.csv,image/*,.png,.jpg,.jpeg" hidden>
         <div class="po-dropzone-icon">📎</div>
         <p><strong>클릭하거나 파일을 끌어다 놓으세요</strong></p>
         <p class="po-dropzone-sub">엑셀(.xlsx, .xls, .csv) 또는 이미지(사진, 스캔본)</p>
@@ -989,43 +1040,8 @@ function renderPoUpload() {
     </div>
 
     ${
-      rows.length
-        ? `
-    <div class="section-block">
-      <div class="section-label">③ 인식된 품목 확인 (${rows.length}건 · 제품 매칭 ${matchedCount}/${rows.length})</div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>품번(바코드)</th>
-              <th>제품 매칭</th>
-              <th>규격</th>
-              <th>단위</th>
-              <th>납기일자</th>
-              <th>발주수량</th>
-              <th>단가</th>
-              <th>금액</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="po-review-body">
-            ${rows.map((r, i) => renderPoRow(r, i)).join("")}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="7" style="text-align:right;font-weight:700">합계</td>
-              <td class="total-row" id="po-total-amount">${formatMoney(totalAmount, channel)}</td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
-        <button class="btn btn-secondary" id="po-btn-add-row">+ 행 추가</button>
-        <button class="btn btn-success btn-lg" id="po-btn-save">💾 저장하고 영업 현황 반영</button>
-      </div>
-    </div>
-    `
+      poUploadState.status === "done" || rows.length
+        ? renderPoReviewSection(channel, rows)
         : ""
     }
   `;
@@ -1043,9 +1059,30 @@ function handlePoFile(file) {
   const applyParsed = (parsed) => {
     const products = getProducts(appData);
     poUploadState.rows = matchPoRowsToProducts(parsed.rows, products);
-    if (parsed.poNumber && !poUploadState.poNumber) poUploadState.poNumber = parsed.poNumber;
+    if (parsed.poNumber) poUploadState.poNumber = parsed.poNumber;
     if (parsed.poDate) poUploadState.poDate = parsed.poDate;
+    if (parsed.isOliveYoung || (parsed.rawText && isOliveYoungPoText(parsed.rawText))) {
+      poUploadState.channelId = "KR-OLIVE";
+      if (!poUploadState.clientName) {
+        const oliveClients = getClients(appData, "KR-OLIVE");
+        const hit =
+          oliveClients.find((c) => /올리브|홍천|OY/i.test(c.name)) ||
+          oliveClients[0];
+        if (hit) poUploadState.clientName = hit.name;
+      }
+    }
     poUploadState.warning = parsed.warning || "";
+    if (parsed.isOliveYoung && poUploadState.rows.length) {
+      poUploadState.warning = [
+        poUploadState.warning,
+        "올리브영 구매발주서로 인식했습니다. 채널이 올리브영으로 설정됩니다.",
+      ]
+        .filter(Boolean)
+        .join(" ");
+    }
+    if (!poUploadState.rows.length && poUploadState.fileKind === "image") {
+      poUploadState.rows = [emptyPoRow(), emptyPoRow(), emptyPoRow()];
+    }
     poUploadState.status = "done";
     poUploadState.statusMsg = "";
     render();
@@ -1089,13 +1126,22 @@ function savePoUpload() {
     return;
   }
   if (!poUploadState.rows.length) {
-    showToast("인식된 품목이 없습니다. 파일을 업로드해주세요");
+    showToast("인식된 품목이 없습니다. 품명·수량·단가·금액을 확인해주세요");
+    return;
+  }
+  const emptyRows = poUploadState.rows.filter((r) => !r.name?.trim() || (r.qty == null && r.amount == null));
+  if (emptyRows.length) {
+    showToast("품명 또는 수량·금액이 비어 있는 행이 있습니다");
     return;
   }
   const unmatched = poUploadState.rows.filter((r) => !r.matchedCode);
   if (unmatched.length) {
-    showToast(`제품 매칭이 안 된 품목이 ${unmatched.length}건 있습니다. 매칭 후 저장해주세요`);
-    return;
+    poUploadState.warning = [
+      poUploadState.warning,
+      `제품 매칭 안 됨 ${unmatched.length}건 — 품번·품명으로 저장됩니다.`,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   const channel = findChannel(poUploadState.channelId);
@@ -1106,8 +1152,8 @@ function savePoUpload() {
     const qty = r.qty ?? 0;
     const amount = r.amount ?? (r.unitPrice != null ? r.unitPrice * qty : 0);
     return {
-      productCode: r.matchedCode,
-      nameKor: product?.nameKor || r.name,
+      productCode: r.matchedCode || `PO-${r.barcode || r.name?.slice(0, 10) || Date.now()}`,
+      nameKor: product?.nameKor || r.name || r.barcode,
       srpKrw: channel.currency === "KRW" ? r.unitPrice : null,
       srpUsd: channel.currency === "USD" ? r.unitPrice : null,
       fobRate: 0,
@@ -1115,6 +1161,7 @@ function savePoUpload() {
       fobKrw: null,
       poQty: qty,
       amount,
+      poBarcode: r.barcode,
     };
   });
   const totalAmount = items.reduce((s, i) => s + i.amount, 0);
@@ -1218,19 +1265,7 @@ function bindPoUploadEvents() {
   });
 
   document.getElementById("po-btn-add-row")?.addEventListener("click", () => {
-    poUploadState.rows.push({
-      barcode: "",
-      name: "",
-      spec: "",
-      unit: "",
-      dueDate: "",
-      qty: null,
-      unitPrice: null,
-      amount: null,
-      amountVat: null,
-      matchedCode: null,
-      matchedName: null,
-    });
+    poUploadState.rows.push(emptyPoRow());
     render();
   });
 

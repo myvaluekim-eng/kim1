@@ -1,15 +1,24 @@
-const PO_HEADER_DEFS = [
+const PO_CORE_HEADERS = [
+  { key: "name", test: /품명|제품명/ },
+  { key: "qty", test: /발주\s*수량|^수량$/ },
+  { key: "unitPrice", test: /단가/ },
+  { key: "amount", test: /^금액$/ },
+];
+
+const PO_EXTRA_HEADERS = [
   { key: "no", test: /^no\.?$|^번호$/i },
   { key: "barcode", test: /품번|바코드/ },
-  { key: "name", test: /품명|제품명/ },
   { key: "spec", test: /규격/ },
   { key: "unit", test: /^단위$/ },
   { key: "dueDate", test: /납기/ },
-  { key: "qty", test: /발주수량|수량/ },
-  { key: "unitPrice", test: /단가/ },
-  { key: "amount", test: /^금액$/ },
-  { key: "amountVat", test: /합계/ },
+  { key: "amountVat", test: /합계.*부가세|합계/ },
 ];
+
+const PO_ALL_HEADERS = [...PO_CORE_HEADERS, ...PO_EXTRA_HEADERS];
+
+function poCompact(text) {
+  return String(text || "").replace(/\s/g, "");
+}
 
 function poNormalizeNumber(value) {
   if (value == null) return null;
@@ -21,14 +30,17 @@ function poNormalizeNumber(value) {
 
 function poNormalizeDateText(value) {
   if (!value) return null;
-  const m = String(value).match(/(\d{4})\s*[.\-\/년]\s*0?(\d{1,2})\s*[.\-\/월]\s*0?(\d{1,2})/);
+  const m = String(value).match(/(\d{4})\s*[.\-\/년]\s*0?(\d{1,2})\s*[.\-\/월]?\s*0?(\d{1,2})/);
   if (!m) return null;
   const [, y, mo, d] = m;
   return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 function poExtractPoNumber(text) {
-  const m = String(text || "").match(/발주\s*번호\s*[:：]?\s*([A-Za-z]?\d[\dA-Za-z-]{4,})/);
+  const compact = poCompact(text);
+  let m = compact.match(/발주번호[:：]?(P0\d{10,}|[A-Z]?\d{5,})/i);
+  if (m) return m[1];
+  m = compact.match(/(P0\d{10,})/i);
   return m ? m[1] : null;
 }
 
@@ -41,20 +53,306 @@ function poExtractPoDate(text) {
   return null;
 }
 
+function isOliveYoungPoText(text) {
+  const compact = poCompact(text);
+  return (
+    /구매발주서|홍천엠앤티|올리브영/.test(compact) ||
+    /P0\d{10}/i.test(compact) ||
+    /발주번호/.test(compact) ||
+    /비고.*OY|OY.*입고/.test(compact)
+  );
+}
+
+function poIsSubtotalRow(text) {
+  const c = poCompact(text);
+  return /^소계/.test(c) || c === "소계" || /^금액합계/.test(c);
+}
+
+function poIsHeaderLikeRow(text) {
+  const c = poCompact(text);
+  return /품명.*발주수량|발주수량.*단가|품번.*품명|^no\.?품번/i.test(c);
+}
+
+function poCoreHeaderScore(found) {
+  const coreCount = PO_CORE_HEADERS.filter((h) => found[h.key] != null).length;
+  return coreCount * 10 + Object.keys(found).length;
+}
+
+function poFindHeadersInRow(row) {
+  const found = {};
+  row.forEach((cell, idx) => {
+    const text = poCompact(cell);
+    if (!text) return;
+    for (const def of PO_ALL_HEADERS) {
+      if (def.test.test(text) && found[def.key] == null) {
+        found[def.key] = idx;
+        break;
+      }
+    }
+  });
+  for (let i = 0; i < row.length - 1; i++) {
+    const joined = poCompact(row[i]) + poCompact(row[i + 1]);
+    for (const def of PO_ALL_HEADERS) {
+      if (def.test.test(joined) && found[def.key] == null) {
+        found[def.key] = i;
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+function poExtractNumbersFromTail(text, excludeText) {
+  let work = text;
+  if (excludeText) work = work.replace(excludeText, " ");
+  const dueDateMatch = work.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+  let numsPart = work;
+  if (dueDateMatch) {
+    numsPart = work.slice(work.indexOf(dueDateMatch[0]) + dueDateMatch[0].length);
+  }
+  const nums = poFilterQtyNumbers(
+    [...numsPart.matchAll(/(\d{1,3}(?:,\d{3})+|\d+)/g)]
+      .map((m) => poNormalizeNumber(m[0]))
+      .filter((n) => n != null)
+  );
+  return { nums, dueDateMatch };
+}
+
+function parsePoCoreLine(lineText) {
+  const line = poNormalizeOcrText(String(lineText || "").trim());
+  if (!line || poIsSubtotalRow(line) || poIsHeaderLikeRow(line)) return null;
+
+  const specMatch = line.match(/(\d+\s*EA\s*\/?\s*\d+)/i);
+  const barcodeMatch = line.match(/(8800\d{9,12})/);
+  const barcode = barcodeMatch ? poNormalizeBarcode(barcodeMatch[0]) : "";
+
+  const { nums, dueDateMatch } = poExtractNumbersFromTail(line, barcodeMatch ? barcodeMatch[0] : "");
+  if (nums.length < 3) return null;
+
+  let qty, unitPrice, amount, amountVat;
+  if (nums.length >= 4) {
+    [qty, unitPrice, amount, amountVat] = nums.slice(-4);
+  } else {
+    [qty, unitPrice, amount] = nums.slice(-3);
+  }
+
+  if (qty != null && unitPrice != null && amount != null) {
+    const expected = qty * unitPrice;
+    if (expected > 0 && Math.abs(expected - amount) / expected > 0.15 && nums.length >= 4) {
+      [qty, unitPrice, amount] = nums.slice(-3);
+      amountVat = nums[nums.length - 1] > amount ? nums[nums.length - 1] : null;
+    }
+  }
+
+  let name = "";
+  if (barcodeMatch) {
+    name = line.slice(line.indexOf(barcodeMatch[0]) + barcodeMatch[0].length);
+  } else {
+    const korean = line.match(/(바를[가-힣0-9a-zA-Z\s()\-+.*%mlg\/]+|[가-힣][가-힣0-9a-zA-Z\s()\-+.*%mlg\/]{3,})/);
+    name = korean ? korean[1] : "";
+  }
+
+  if (specMatch) {
+    const idx = name.indexOf(specMatch[0]);
+    if (idx >= 0) name = name.slice(0, idx);
+  }
+  if (dueDateMatch) name = name.replace(dueDateMatch[0], "");
+  name = name
+    .replace(/^\d+[\s.)]+/, "")
+    .replace(/\bEA\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (name.length < 2 && !barcode) return null;
+  if (qty == null && amount == null) return null;
+
+  return {
+    barcode,
+    name,
+    spec: specMatch ? specMatch[0].replace(/\s/g, "") : "",
+    unit: /\bEA\b/i.test(line) ? "EA" : "",
+    dueDate: dueDateMatch ? poNormalizeDateText(dueDateMatch[0]) : "",
+    qty,
+    unitPrice,
+    amount,
+    amountVat: amountVat ?? null,
+  };
+}
+
+function poMergeMultilineRows(rawLines) {
+  const merged = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    let line = rawLines[i];
+    if (poIsHeaderLikeRow(line) || poIsSubtotalRow(line) || /구매발주서|발주번호/.test(line)) {
+      merged.push(line);
+      continue;
+    }
+
+    const hasKorean = /[가-힣]{2,}/.test(line) || /바를/.test(line);
+    const hasNums = /(\d{1,3}(?:,\d{3})+|\d{4,})/.test(line);
+    const hasBarcode = /8800\d{9}|\d{13}/.test(line);
+
+    if ((hasKorean || hasBarcode) && !hasNums && i + 1 < rawLines.length) {
+      const next = rawLines[i + 1];
+      if (
+        /(\d{1,3}(?:,\d{3})+|\d+)/.test(next) &&
+        !poIsSubtotalRow(next) &&
+        !poIsHeaderLikeRow(next)
+      ) {
+        line = `${line} ${next}`;
+        i++;
+      }
+    }
+    merged.push(line);
+  }
+  return merged;
+}
+
+function poNormalizeOcrText(text) {
+  let t = String(text || "")
+    .replace(/(\d),\s+(\d)/g, "$1$2")
+    .replace(/(\d{4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})/g, "$1-$2-$3")
+    .replace(/바\s*를/g, "바를")
+    .replace(/발\s*주\s*수\s*량/g, "발주수량")
+    .replace(/[|｜]/g, " ");
+
+  t = t.replace(/8800(?:[\s\d]{10,20})/g, (match) => {
+    const digits = match.replace(/\D/g, "");
+    if (digits.startsWith("8800") && digits.length >= 12) return digits.slice(0, 13);
+    return match.replace(/\s/g, "");
+  });
+  return t;
+}
+
+function poFilterQtyNumbers(nums) {
+  return nums.filter((n) => {
+    const s = String(Math.round(n));
+    if (s.length >= 12 && s.startsWith("8800")) return false;
+    if (n > 999999999) return false;
+    return true;
+  });
+}
+
+function poNormalizeBarcode(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length >= 12 && digits.startsWith("8800")) return digits.slice(0, 13);
+  return digits.length >= 10 ? digits : "";
+}
+
+function parsePoByBarcodeBlocks(text) {
+  const normalized = poNormalizeOcrText(text);
+  const chunks = normalized.split(/(?=\b8800[\d\s]{9,14}\b)/).filter(Boolean);
+  const rows = [];
+
+  for (const chunk of chunks) {
+    const row = parsePoCoreLine(chunk.trim());
+    if (row?.name) rows.push(row);
+  }
+  return rows;
+}
+
+function parsePoFromOcrBlocks(text) {
+  const lines = poNormalizeOcrText(text)
+    .split(/\n|\r/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const rows = [];
+  let buffer = [];
+
+  const flush = () => {
+    if (!buffer.length) return;
+    const combined = buffer.join(" ");
+    const row = parsePoCoreLine(combined);
+    if (row?.name) rows.push(row);
+    buffer = [];
+  };
+
+  for (const line of lines) {
+    if (poIsSubtotalRow(line)) {
+      flush();
+      break;
+    }
+    if (/8800[\d\s]{9,}/.test(line) && buffer.length) flush();
+
+    const isDataLine =
+      /8800[\d\s]{9,}/.test(line) ||
+      /바를|[가-힣]{2,}/.test(line) ||
+      /\d{4}-\d{1,2}-\d{1,2}/.test(line) ||
+      /(\d{1,3}(?:,\d{3})+|\d{2,})/.test(line);
+
+    if (isDataLine) buffer.push(line);
+
+    const combined = buffer.join(" ");
+    const hasBarcode = /8800[\d\s]{9,}/.test(combined);
+    const { nums } = poExtractNumbersFromTail(combined);
+    if (hasBarcode && nums.length >= 3 && /[가-힣]{2,}/.test(combined)) flush();
+  }
+  flush();
+  return rows;
+}
+
+function parsePoAllStrategies(text) {
+  const normalized = poNormalizeOcrText(text);
+  const strategies = [
+    () => parsePoCoreText(normalized),
+    () => parsePoByBarcodeBlocks(normalized),
+    () => parsePoFromOcrBlocks(normalized),
+  ];
+
+  let best = [];
+  for (const fn of strategies) {
+    const rows = fn();
+    if (rows.length > best.length) best = rows;
+  }
+  return best;
+}
+
+function parsePoCoreText(text) {
+  const normalized = poNormalizeOcrText(text);
+  const rawLines = normalized
+    .split(/\n|\r/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const lines = poMergeMultilineRows(rawLines);
+  const rows = [];
+
+  for (const line of lines) {
+    if (poIsSubtotalRow(line)) break;
+    const row = parsePoCoreLine(line);
+    if (row) rows.push(row);
+  }
+
+  if (rows.length) return rows;
+  return parsePoByBarcodeBlocks(normalized);
+}
+
+function poNormalizeNameForMatch(name) {
+  return String(name || "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/기획|트래블\s*키트|온|세트/g, "")
+    .replace(/[^\w가-힣]/g, "")
+    .toLowerCase();
+}
+
 function matchPoProduct(products, { barcode, name }) {
   if (barcode) {
     const digits = String(barcode).replace(/\D/g, "");
     if (digits) {
-      const hit = products.find((p) => p.barcode && p.barcode.replace(/\D/g, "") === digits);
-      if (hit) return hit.code;
+      const exact = products.find((p) => p.barcode && p.barcode.replace(/\D/g, "") === digits);
+      if (exact) return exact.code;
     }
   }
   if (name) {
-    const n = name.replace(/\s+/g, "");
-    if (n) {
+    const n = poNormalizeNameForMatch(name);
+    if (n.length >= 4) {
       const hit = products.find((p) => {
-        const pn = p.nameKor.replace(/\s+/g, "");
-        return pn && n && (pn.includes(n) || n.includes(pn));
+        const pn = poNormalizeNameForMatch(p.nameKor);
+        if (!pn || pn.length < 4) return false;
+        const core = n.slice(0, Math.min(8, n.length));
+        const pCore = pn.slice(0, Math.min(8, pn.length));
+        return pn.includes(core) || n.includes(pCore) || pn.includes(n) || n.includes(pn);
       });
       if (hit) return hit.code;
     }
@@ -70,69 +368,74 @@ function matchPoRowsToProducts(rows, products) {
   });
 }
 
+function poRowFromColumns(row, colMap) {
+  const cell = (key) => (colMap[key] != null ? row[colMap[key]] : "");
+  const name = String(cell("name") || "").trim();
+  const qty = poNormalizeNumber(cell("qty"));
+  const unitPrice = poNormalizeNumber(cell("unitPrice"));
+  const amount = poNormalizeNumber(cell("amount"));
+  const barcodeText = String(cell("barcode") || "").trim();
+  const barcodeMatch = barcodeText.match(/\d{10,14}/) || row.join(" ").match(/\d{13}|8800\d{9}/);
+
+  if (poIsHeaderLikeRow(name) || poIsSubtotalRow(name)) return null;
+  if (!name && !barcodeMatch) return null;
+  if (qty == null && unitPrice == null && amount == null) {
+    const lineRow = parsePoCoreLine(row.join(" "));
+    if (lineRow) return lineRow;
+    return null;
+  }
+
+  return {
+    barcode: barcodeMatch ? barcodeMatch[0] : barcodeText,
+    name: name || "",
+    spec: String(cell("spec") || "").trim(),
+    unit: String(cell("unit") || "").trim(),
+    dueDate: poNormalizeDateText(cell("dueDate")),
+    qty,
+    unitPrice,
+    amount,
+    amountVat: poNormalizeNumber(cell("amountVat")),
+  };
+}
+
 function parsePoMatrix(matrix) {
   const allText = matrix.map((row) => row.join(" ")).join("\n");
 
   let headerRowIdx = -1;
   let colMap = {};
-  for (let i = 0; i < matrix.length; i++) {
-    const row = matrix[i];
-    const found = {};
-    row.forEach((cell, idx) => {
-      const text = String(cell || "").replace(/\s/g, "");
-      if (!text) return;
-      for (const def of PO_HEADER_DEFS) {
-        if (def.test.test(text) && found[def.key] == null) {
-          found[def.key] = idx;
-          break;
-        }
-      }
-    });
-    if (Object.keys(found).length >= 4) {
+  let bestScore = 0;
+
+  for (let i = 0; i < Math.min(matrix.length, 100); i++) {
+    const found = poFindHeadersInRow(matrix[i]);
+    const score = poCoreHeaderScore(found);
+    if (score >= 30 && score > bestScore) {
+      bestScore = score;
       headerRowIdx = i;
       colMap = found;
-      break;
     }
   }
 
-  if (headerRowIdx === -1) {
-    return {
-      poNumber: poExtractPoNumber(allText),
-      poDate: poExtractPoDate(allText),
-      rows: [],
-      warning: "표 헤더를 인식하지 못했습니다. 아래 표에 직접 입력해주세요.",
-    };
+  let rows = [];
+  if (headerRowIdx >= 0) {
+    for (let r = headerRowIdx + 1; r < matrix.length; r++) {
+      const row = matrix[r];
+      const rowText = row.join(" ");
+      if (poIsSubtotalRow(rowText)) break;
+      const built = poRowFromColumns(row, colMap);
+      if (built && built.name) rows.push(built);
+    }
   }
 
-  const rows = [];
-  for (let r = headerRowIdx + 1; r < matrix.length; r++) {
-    const row = matrix[r];
-    const rowText = row.join("").replace(/\s/g, "");
-    if (/소계|합계/.test(rowText)) break;
-
-    const barcodeText = colMap.barcode != null ? row[colMap.barcode] : "";
-    const nameText = colMap.name != null ? row[colMap.name] : "";
-    if (!String(barcodeText || "").trim() && !String(nameText || "").trim()) continue;
-
-    const barcodeDigits = String(barcodeText || "").match(/\d{6,}/);
-    rows.push({
-      barcode: barcodeDigits ? barcodeDigits[0] : String(barcodeText || "").trim(),
-      name: String(nameText || "").trim(),
-      spec: colMap.spec != null ? String(row[colMap.spec] || "").trim() : "",
-      unit: colMap.unit != null ? String(row[colMap.unit] || "").trim() : "",
-      dueDate: poNormalizeDateText(colMap.dueDate != null ? row[colMap.dueDate] : ""),
-      qty: poNormalizeNumber(colMap.qty != null ? row[colMap.qty] : null),
-      unitPrice: poNormalizeNumber(colMap.unitPrice != null ? row[colMap.unitPrice] : null),
-      amount: poNormalizeNumber(colMap.amount != null ? row[colMap.amount] : null),
-      amountVat: poNormalizeNumber(colMap.amountVat != null ? row[colMap.amountVat] : null),
-    });
+  if (!rows.length) {
+    rows = parsePoAllStrategies(allText);
   }
 
   return {
     poNumber: poExtractPoNumber(allText),
     poDate: poExtractPoDate(allText),
     rows,
-    warning: rows.length ? null : "표 데이터를 찾지 못했습니다. 아래 표에 직접 입력해주세요.",
+    isOliveYoung: isOliveYoungPoText(allText),
+    warning: rows.length ? null : "품명·발주수량·단가·금액을 찾지 못했습니다. 아래 표에 직접 입력해주세요.",
   };
 }
 
@@ -147,9 +450,14 @@ function parsePoExcelFile(file) {
     reader.onload = (e) => {
       try {
         const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
-        resolve(parsePoMatrix(matrix));
+        let best = null;
+        wb.SheetNames.forEach((sheetName) => {
+          const ws = wb.Sheets[sheetName];
+          const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+          const parsed = parsePoMatrix(matrix);
+          if (!best || parsed.rows.length > best.rows.length) best = parsed;
+        });
+        resolve(best || parsePoMatrix([]));
       } catch (err) {
         reject(err);
       }
@@ -179,10 +487,216 @@ function poExtractOcrWords(data) {
   return null;
 }
 
+function poBuildColumnRanges(colAnchors) {
+  const entries = Object.entries(colAnchors).sort((a, b) => a[1] - b[1]);
+  return entries.map(([key, x], idx) => ({
+    key,
+    min: idx === 0 ? 0 : (entries[idx - 1][1] + x) / 2 - 15,
+    max: idx + 1 < entries.length ? (x + entries[idx + 1][1]) / 2 - 15 : Infinity,
+  }));
+}
+
+function poColumnTexts(lineWords, columns) {
+  const buckets = {};
+  lineWords.forEach((w) => {
+    const col = columns.find((c) => w.xc >= c.min && w.xc < c.max);
+    if (!col) return;
+    if (!buckets[col.key]) buckets[col.key] = [];
+    buckets[col.key].push(w.text);
+  });
+  return {
+    name: (buckets.name || []).join(" ").replace(/^\d+\s*/, "").trim(),
+    qty: poNormalizeNumber((buckets.qty || []).join("")),
+    unitPrice: poNormalizeNumber((buckets.unitPrice || []).join("")),
+    amount: poNormalizeNumber((buckets.amount || []).join("")),
+  };
+}
+
+function poGroupOcrLines(words) {
+  const ws = words
+    .filter((w) => w.text?.trim())
+    .map((w) => ({
+      text: w.text.trim(),
+      x0: w.bbox.x0,
+      y0: w.bbox.y0,
+      x1: w.bbox.x1,
+      y1: w.bbox.y1,
+      xc: (w.bbox.x0 + w.bbox.x1) / 2,
+      yc: (w.bbox.y0 + w.bbox.y1) / 2,
+    }));
+  if (!ws.length) return [];
+
+  const hMed = ws.reduce((s, w) => s + (w.y1 - w.y0), 0) / ws.length || 15;
+  const yThresh = hMed * 0.55;
+  const lines = [];
+
+  ws.forEach((w) => {
+    let line = lines.find((l) => Math.abs(l.yc - w.yc) < yThresh);
+    if (!line) {
+      line = { yc: w.yc, words: [] };
+      lines.push(line);
+    }
+    line.words.push(w);
+    line.yc = line.words.reduce((s, x) => s + x.yc, 0) / line.words.length;
+  });
+  lines.forEach((l) => l.words.sort((a, b) => a.x0 - b.x0));
+  lines.sort((a, b) => a.yc - b.yc);
+  return lines;
+}
+
+function parsePoTableFromOcrWords(words, fullText) {
+  const lines = poGroupOcrLines(words);
+  if (!lines.length) return null;
+
+  let headerIdx = -1;
+  let colAnchors = {};
+  for (let i = 0; i < lines.length; i++) {
+    const anchors = {};
+    lines[i].words.forEach((w) => {
+      const c = poCompact(w.text);
+      if (/품명|제품명/.test(c)) anchors.name = w.xc;
+      if (/발주수량/.test(c) || c === "수량") anchors.qty = w.xc;
+      if (/단가/.test(c)) anchors.unitPrice = w.xc;
+      if (c === "금액") anchors.amount = w.xc;
+    });
+    const core = ["name", "qty", "unitPrice", "amount"].filter((k) => anchors[k] != null).length;
+    if (core >= 3) {
+      headerIdx = i;
+      colAnchors = anchors;
+      break;
+    }
+  }
+
+  if (headerIdx === -1) return null;
+
+  const columns = poBuildColumnRanges(colAnchors);
+  const rows = [];
+  let pending = null;
+
+  const flushPending = () => {
+    if (!pending) return;
+    if (pending.name && (pending.qty != null || pending.amount != null)) rows.push(pending);
+    pending = null;
+  };
+
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const lineText = lines[i].words.map((w) => w.text).join(" ");
+    if (poIsSubtotalRow(lineText)) break;
+
+    const cols = poColumnTexts(lines[i].words, columns);
+    const barcodeMatch = lineText.match(/8800\d{9,12}/);
+    const hasBarle = /바를/.test(lineText);
+    const isNewRow = /^[1-9]\s/.test(lineText) || barcodeMatch || (hasBarle && cols.name);
+
+    if (isNewRow && pending) flushPending();
+
+    const base = {
+      barcode: barcodeMatch ? poNormalizeBarcode(barcodeMatch[0]) : "",
+      name: cols.name,
+      spec: "",
+      unit: "EA",
+      dueDate: poNormalizeDateText(lineText),
+      qty: cols.qty,
+      unitPrice: cols.unitPrice,
+      amount: cols.amount,
+      amountVat: null,
+    };
+
+    if (!base.name && !base.barcode && base.qty == null && base.amount == null) continue;
+
+    if (!pending) {
+      pending = base;
+      continue;
+    }
+
+    pending.name = [pending.name, base.name].filter(Boolean).join(" ").trim();
+    pending.qty ??= base.qty;
+    pending.unitPrice ??= base.unitPrice;
+    pending.amount ??= base.amount;
+    pending.barcode = pending.barcode || base.barcode;
+    pending.dueDate = pending.dueDate || base.dueDate;
+    if (pending.qty != null || pending.amount != null) flushPending();
+  }
+  flushPending();
+
+  if (!rows.length) return null;
+
+  return {
+    poNumber: poExtractPoNumber(fullText),
+    poDate: poExtractPoDate(fullText),
+    rows,
+    isOliveYoung: isOliveYoungPoText(fullText),
+    warning: "표 열(품명·발주수량·단가·금액) 기준으로 인식했습니다. 저장 전 확인해주세요.",
+  };
+}
+
+function preprocessPoImageFile(file) {
+  return new Promise((resolve, reject) => {
+    if (typeof document === "undefined") {
+      resolve(file);
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const scale = Math.max(1.5, 2200 / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const d = imageData.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          const v = gray > 200 ? 255 : gray < 90 ? 0 : gray < 140 ? 0 : 255;
+          d[i] = d[i + 1] = d[i + 2] = v;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(url);
+          resolve(blob || file);
+        }, "image/png");
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
+
+function poFinalizeParseResult(parsed, fullText) {
+  parsed = parsed || parsePoFromPlainText(fullText);
+  if (!parsed.rows.length) {
+    const retry = parsePoAllStrategies(fullText);
+    if (retry.length) parsed.rows = retry;
+  }
+  if (!parsed.rows.length && isOliveYoungPoText(fullText)) {
+    parsed.isOliveYoung = true;
+    parsed.warning =
+      "올리브영 발주서로 확인되지만 품목을 읽지 못했습니다. 아래 표에 직접 입력해주세요.";
+  }
+  parsed.rawText = fullText;
+  return parsed;
+}
+
 function parsePoFromOcrWords(words, fullText) {
+  const tableParsed = parsePoTableFromOcrWords(words, fullText);
+  if (tableParsed?.rows?.length) return poFinalizeParseResult(tableParsed, fullText);
+
   const sorted = [...words].sort((a, b) => a.bbox.y0 - b.bbox.y0);
   const avgHeight = sorted.reduce((s, w) => s + (w.bbox.y1 - w.bbox.y0), 0) / sorted.length || 20;
-  const lineThreshold = avgHeight * 0.6;
+  const lineThreshold = avgHeight * 0.55;
 
   const lines = [];
   sorted.forEach((w) => {
@@ -198,153 +712,142 @@ function parsePoFromOcrWords(words, fullText) {
   lines.forEach((l) => l.words.sort((a, b) => a.bbox.x0 - b.bbox.x0));
   lines.sort((a, b) => a.yc - b.yc);
 
-  let headerLineIdx = -1;
-  let colBounds = [];
-  for (let i = 0; i < lines.length; i++) {
-    const matches = [];
-    lines[i].words.forEach((w) => {
-      const clean = w.text.replace(/\s/g, "");
-      for (const def of PO_HEADER_DEFS) {
-        if (def.test.test(clean)) {
-          matches.push({ key: def.key, x0: w.bbox.x0 });
-          break;
-        }
+  const lineTexts = lines.map((l) => l.words.map((w) => w.text).join(" "));
+  const mergedText = poMergeMultilineRows(lineTexts).join("\n");
+  let rows = parsePoCoreText(mergedText);
+
+  if (!rows.length) {
+    let headerLineIdx = -1;
+    let colBounds = [];
+    let bestScore = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const lineCompact = lines[i].words.map((w) => w.text).join("");
+      const found = {};
+      for (const def of PO_ALL_HEADERS) {
+        if (def.test.test(poCompact(lineCompact))) found[def.key] = true;
       }
-    });
-    const uniqueKeys = new Set(matches.map((m) => m.key));
-    if (uniqueKeys.size >= 4) {
-      headerLineIdx = i;
-      colBounds = matches;
-      break;
+      const score = poCoreHeaderScore(
+        Object.fromEntries(Object.keys(found).map((k) => [k, 0]))
+      );
+      if (score >= 30 && score > bestScore) {
+        bestScore = score;
+        headerLineIdx = i;
+        const matches = [];
+        lines[i].words.forEach((w) => {
+          const clean = poCompact(w.text);
+          for (const def of PO_ALL_HEADERS) {
+            if (def.test.test(clean)) matches.push({ key: def.key, x0: w.bbox.x0 });
+          }
+        });
+        colBounds = matches;
+      }
+    }
+
+    if (headerLineIdx >= 0 && colBounds.length) {
+      colBounds.sort((a, b) => a.x0 - b.x0);
+      const columns = colBounds.map((c, idx) => ({
+        key: c.key,
+        start: c.x0 - 25,
+        end: idx + 1 < colBounds.length ? colBounds[idx + 1].x0 - 25 : Infinity,
+      }));
+
+      for (let i = headerLineIdx + 1; i < lines.length; i++) {
+        const line = lines[i];
+        const lineText = line.words.map((w) => w.text).join(" ");
+        if (poIsSubtotalRow(lineText)) break;
+
+        const coreLine = parsePoCoreLine(lineText);
+        if (coreLine) {
+          rows.push(coreLine);
+          continue;
+        }
+
+        const fields = {};
+        line.words.forEach((w) => {
+          const col = columns.find((c) => w.bbox.x0 >= c.start && w.bbox.x0 < c.end) || columns[columns.length - 1];
+          fields[col.key] = fields[col.key] ? `${fields[col.key]} ${w.text}` : w.text;
+        });
+
+        const built = {
+          barcode: (fields.barcode || lineText).match(/\d{10,14}/)?.[0] || "",
+          name: (fields.name || "").trim(),
+          spec: (fields.spec || "").trim(),
+          unit: (fields.unit || "").trim(),
+          dueDate: poNormalizeDateText(fields.dueDate || ""),
+          qty: poNormalizeNumber(fields.qty),
+          unitPrice: poNormalizeNumber(fields.unitPrice),
+          amount: poNormalizeNumber(fields.amount),
+          amountVat: poNormalizeNumber(fields.amountVat),
+        };
+        if (built.name && (built.qty != null || built.amount != null)) rows.push(built);
+      }
     }
   }
 
-  if (headerLineIdx === -1) {
-    return {
-      poNumber: poExtractPoNumber(fullText),
-      poDate: poExtractPoDate(fullText),
-      rows: [],
-      warning: "표 헤더를 인식하지 못했습니다. 아래 표에 직접 입력해주세요.",
-      rawText: fullText,
-    };
-  }
-
-  colBounds.sort((a, b) => a.x0 - b.x0);
-  const columns = colBounds.map((c, idx) => ({
-    key: c.key,
-    start: c.x0 - 20,
-    end: idx + 1 < colBounds.length ? colBounds[idx + 1].x0 - 20 : Infinity,
-  }));
-
-  const rows = [];
-  for (let i = headerLineIdx + 1; i < lines.length; i++) {
-    const line = lines[i];
-    const lineText = line.words.map((w) => w.text).join(" ");
-    if (/소계|합\s*계/.test(lineText.replace(/\s/g, ""))) break;
-
-    const fields = {};
-    line.words.forEach((w) => {
-      const col = columns.find((c) => w.bbox.x0 >= c.start && w.bbox.x0 < c.end) || columns[columns.length - 1];
-      fields[col.key] = fields[col.key] ? `${fields[col.key]} ${w.text}` : w.text;
-    });
-    if (!fields.barcode && !fields.name) continue;
-
-    const barcodeDigits = (fields.barcode || "").match(/\d{6,}/);
-    rows.push({
-      barcode: barcodeDigits ? barcodeDigits[0] : (fields.barcode || "").trim(),
-      name: (fields.name || "").trim(),
-      spec: (fields.spec || "").trim(),
-      unit: (fields.unit || "").trim(),
-      dueDate: poNormalizeDateText(fields.dueDate || ""),
-      qty: poNormalizeNumber(fields.qty),
-      unitPrice: poNormalizeNumber(fields.unitPrice),
-      amount: poNormalizeNumber(fields.amount),
-      amountVat: poNormalizeNumber(fields.amountVat),
-    });
+  if (!rows.length) {
+    rows = parsePoAllStrategies(fullText);
   }
 
   return {
     poNumber: poExtractPoNumber(fullText),
     poDate: poExtractPoDate(fullText),
     rows,
-    warning: rows.length ? null : "표 데이터를 인식하지 못했습니다. 아래 표에 직접 입력해주세요.",
+    isOliveYoung: isOliveYoungPoText(fullText),
+    warning: rows.length ? "OCR 인식 결과입니다. 품명·수량·단가·금액을 확인해주세요." : "자동 인식에 실패했습니다. 아래 표에 직접 입력하거나 엑셀 파일을 업로드해주세요.",
     rawText: fullText,
   };
 }
 
 function parsePoFromPlainText(text) {
-  const lines = String(text || "")
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const rows = [];
-
-  for (const line of lines) {
-    if (/소계|합\s*계/.test(line.replace(/\s/g, ""))) break;
-    const barcodeMatch = line.match(/\b(\d{10,14})\b/);
-    if (!barcodeMatch) continue;
-
-    const barcode = barcodeMatch[1];
-    let rest = line.slice(barcodeMatch.index + barcode.length).trim();
-    const dueDateMatch = rest.match(/\d{4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}/);
-    const specMatch = rest.match(/\d+\s*EA\s*\/\s*\d+/i);
-    const numTokens = rest.match(/[\d,]{2,}/g) || [];
-
-    let name = rest;
-    if (dueDateMatch) name = name.replace(dueDateMatch[0], "");
-    if (specMatch) name = name.replace(specMatch[0], "");
-    numTokens.forEach((t) => (name = name.replace(t, "")));
-    name = name.replace(/\bEA\b/gi, "").replace(/\s+/g, " ").trim();
-
-    const trailing = numTokens.slice(-4);
-    const [qty, unitPrice, amount, amountVat] = [
-      trailing[trailing.length - 4],
-      trailing[trailing.length - 3],
-      trailing[trailing.length - 2],
-      trailing[trailing.length - 1],
-    ];
-
-    rows.push({
-      barcode,
-      name,
-      spec: specMatch ? specMatch[0] : "",
-      unit: /\bEA\b/i.test(rest) ? "EA" : "",
-      dueDate: poNormalizeDateText(dueDateMatch ? dueDateMatch[0] : ""),
-      qty: poNormalizeNumber(qty),
-      unitPrice: poNormalizeNumber(unitPrice),
-      amount: poNormalizeNumber(amount),
-      amountVat: poNormalizeNumber(amountVat),
-    });
-  }
-
+  const rows = parsePoAllStrategies(text);
   return {
     poNumber: poExtractPoNumber(text),
     poDate: poExtractPoDate(text),
     rows,
+    isOliveYoung: isOliveYoungPoText(text),
     warning: rows.length
-      ? "표 형식을 단순 인식했습니다. 값을 꼭 확인해주세요."
-      : "표 데이터를 인식하지 못했습니다. 아래 표에 직접 입력해주세요.",
+      ? "인식 결과입니다. 품명·수량·단가·금액을 확인해주세요."
+      : "자동 인식에 실패했습니다. 아래 표에 직접 입력하거나 엑셀 파일을 업로드해주세요.",
     rawText: text,
   };
 }
 
 function parsePoImageFile(file, onProgress) {
-  return new Promise((resolve, reject) => {
+  return (async () => {
     if (typeof Tesseract === "undefined") {
-      reject(new Error("OCR 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요."));
-      return;
+      throw new Error("OCR 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.");
     }
-    Tesseract.recognize(file, "kor+eng", {
-      logger: (m) => onProgress && onProgress(m),
-    })
-      .then((result) => {
-        const words = poExtractOcrWords(result.data);
-        if (words && words.length) {
-          resolve(parsePoFromOcrWords(words, result.data.text || ""));
-        } else {
-          resolve(parsePoFromPlainText(result.data.text || ""));
+
+    const input = await preprocessPoImageFile(file);
+    const logger = (m) => onProgress && onProgress(m);
+
+    async function runOcr(recognizeInput) {
+      try {
+        const worker = await Tesseract.createWorker("kor+eng", 1, { logger });
+        try {
+          await worker.setParameters({
+            tessedit_pageseg_mode: Tesseract.PSM?.SINGLE_BLOCK || "6",
+            preserve_interword_spaces: "1",
+          });
+          return await worker.recognize(recognizeInput);
+        } finally {
+          await worker.terminate();
         }
-      })
-      .catch(reject);
-  });
+      } catch (_) {
+        return Tesseract.recognize(recognizeInput, "kor+eng", { logger });
+      }
+    }
+
+    const result = await runOcr(input);
+    const fullText = result.data.text || "";
+    const words = poExtractOcrWords(result.data) || [];
+
+    let parsed = null;
+    if (words.length) parsed = parsePoTableFromOcrWords(words, fullText);
+    if (!parsed?.rows?.length && words.length) parsed = parsePoFromOcrWords(words, fullText);
+    if (!parsed?.rows?.length) parsed = parsePoFromPlainText(fullText);
+
+    return poFinalizeParseResult(parsed, fullText);
+  })();
 }
