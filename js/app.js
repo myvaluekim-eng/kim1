@@ -99,7 +99,7 @@ let proposalState = {
   items: {},
 };
 
-let quickClientCallback = null;
+let productEditCode = null;
 
 function freshPoUploadState() {
   return {
@@ -137,10 +137,9 @@ function initProposalState(channelId) {
   proposalState.exchangeRate = appData.exchangeRate || DEFAULT_EXCHANGE_RATE;
   proposalState.items = {};
   getProducts(appData).forEach((p) => {
-    const srp = getChannelSrp(appData, p.code, channel.id);
     proposalState.items[p.code] = {
-      srpKrw: srp.krw ?? p.srpKrw ?? null,
-      srpUsd: srp.usd ?? p.srpUsd ?? null,
+      srpKrw: p.srpKrw ?? null,
+      srpUsd: p.srpUsd ?? null,
       poQty: 0,
     };
   });
@@ -472,12 +471,11 @@ const PAGE_META = {
   dashboard: { title: "홈", desc: "Barle 영업 관리 홈입니다. 단가표·발주가 메인 업무이고, 데이터 등록은 처음 한 번만 설정하면 됩니다." },
   proposal: { title: "단가표 만들기", desc: "바이어에게 보낼 견적 · 가격표를 작성합니다. 저장해도 매출에는 반영되지 않습니다." },
   poupload: { title: "발주서 등록", desc: "수기 입력 또는 파일 업로드로 발주를 등록합니다. 저장 시 영업 현황에 반영됩니다." },
-  products: { title: "제품 등록", desc: "품목과 가격 정보를 등록합니다. 단가표·발주서 작성 전에 준비해 두세요." },
+  products: { title: "제품 등록", desc: "품목·물류·기준 가격을 등록·수정합니다. 여기 입력한 소비자가가 단가표·발주서의 기준이 됩니다." },
   master: {
     title: "거래처 통합 등록",
     desc: "판매국가, 거래 업체, 거래 조건을 한 화면에서 등록·수정합니다.",
   },
-  srp: { title: "소비자가 설정", desc: "국가별 권장 소비자가를 입력해 두면 단가표 작성 시 자동으로 채워집니다. (선택)" },
   history: { title: "지난 단가표", desc: "저장된 견적 · 가격표 이력을 확인합니다." },
   sales: { title: "영업 현황", desc: "월별 발주 건수와 금액을 국가·업체별로 확인합니다." },
 };
@@ -486,6 +484,7 @@ function parseViewFromHash() {
   const hash = location.hash.replace(/^#/, "").trim();
   if (!hash) return "dashboard";
   if (hash === "channels" || hash === "clients" || hash === "terms") return "master";
+  if (hash === "srp") return "products";
   return PAGE_META[hash] ? hash : "dashboard";
 }
 
@@ -565,10 +564,6 @@ function render() {
       case "master":
         content.innerHTML = renderMaster();
         bindMasterEvents();
-        break;
-      case "srp":
-        content.innerHTML = renderSrpMatrix();
-        bindSrpEvents();
         break;
       case "history":
         content.innerHTML = renderHistory();
@@ -715,17 +710,12 @@ function renderDashboard() {
           <button class="action-card data-card" onclick="setView('products')">
             <div class="action-icon">📦</div>
             <div class="action-title">제품 등록</div>
-            <div class="action-desc">품목 · 가격 정보</div>
+            <div class="action-desc">품목 · 기준 가격</div>
           </button>
           <button class="action-card data-card" onclick="openMaster('')">
             <div class="action-icon">🌐</div>
             <div class="action-title">거래처 통합 등록</div>
             <div class="action-desc">국가 · 업체 · 거래조건</div>
-          </button>
-          <button class="action-card data-card" onclick="setView('srp')">
-            <div class="action-icon">💰</div>
-            <div class="action-title">소비자가 설정</div>
-            <div class="action-desc">국가별 권장가 (선택)</div>
           </button>
           <button class="action-card data-card" onclick="openMaster('')">
             <div class="action-icon">✨</div>
@@ -846,7 +836,7 @@ function renderProposal() {
       <span class="help-icon">💡</span>
       <div>
         <strong>단가표 = 견적</strong> · 바이어에게 보내는 가격표입니다. 저장해도 <strong>영업 현황(매출)에는 포함되지 않습니다.</strong><br>
-        노란 칸(소비자가, 주문수량)만 직접 입력하세요. 연두 칸(FOB, 금액)은 자동으로 계산됩니다.
+        소비자가는 <strong>제품 등록</strong>의 기준 가격이 자동으로 채워집니다. 노란 칸만 직접 수정하세요.
       </div>
     </div>
 
@@ -1005,15 +995,6 @@ function bindProposalEvents() {
         proposalState.items[code][field] = parseFloat(e.target.value) || 0;
       } else {
         proposalState.items[code][field] = parseOptionalNumber(e.target.value);
-        const item = proposalState.items[code];
-        setChannelSrp(
-          appData,
-          code,
-          proposalState.channelId,
-          item.srpKrw,
-          item.srpUsd
-        );
-        saveData(appData);
       }
       updateProposalCalcs(channel);
     });
@@ -1251,8 +1232,7 @@ function convertPoManualPrice(price, from, to) {
   return Math.round(usd * jpyRate);
 }
 
-function resolvePoManualUnitPriceUsd(product, srp) {
-  if (srp?.usd != null && srp.usd > 0) return srp.usd;
+function resolvePoManualUnitPriceUsd(product) {
   if (product?.fobUsd != null && product.fobUsd > 0) return product.fobUsd;
   if (product?.srpUsd != null && product.srpUsd > 0) return product.srpUsd;
   return null;
@@ -1260,23 +1240,21 @@ function resolvePoManualUnitPriceUsd(product, srp) {
 
 function resolvePoManualUnitPrice(code, currency) {
   const product = getProducts(appData).find((p) => p.code === code);
-  const srp = getChannelSrp(appData, code, poUploadState.channelId);
   const rate = getPoManualExchangeRate();
 
   if (currency === "KRW") {
-    if (srp.krw != null && srp.krw > 0) return srp.krw;
     if (product?.srpKrw != null && product.srpKrw > 0) return product.srpKrw;
-    const usd = resolvePoManualUnitPriceUsd(product, srp);
+    const usd = resolvePoManualUnitPriceUsd(product);
     return usd != null ? Math.round(usd * rate) : null;
   }
 
   if (currency === "JPY") {
     const jpyRate = getPoManualJpyRate();
-    const usd = resolvePoManualUnitPriceUsd(product, srp);
+    const usd = resolvePoManualUnitPriceUsd(product);
     return usd != null ? Math.round(usd * jpyRate) : null;
   }
 
-  return resolvePoManualUnitPriceUsd(product, srp);
+  return resolvePoManualUnitPriceUsd(product);
 }
 
 function createPoManualItem(code) {
@@ -1842,79 +1820,134 @@ function bindPoUploadEvents() {
   document.getElementById("po-btn-save")?.addEventListener("click", savePoUpload);
 }
 
-function renderProducts() {
-  const products = getProducts(appData);
+function parseProductForm(fd) {
+  return {
+    code: fd.get("code").trim(),
+    category: fd.get("category").trim(),
+    nameKor: fd.get("nameKor").trim(),
+    nameEng: fd.get("nameEng").trim(),
+    barcode: fd.get("barcode").trim() || "",
+    size: fd.get("size").trim() || "",
+    cartonQty: Number(fd.get("cartonQty")) || 50,
+    cartonSize: fd.get("cartonSize").trim() || "",
+    cbm: Number(fd.get("cbm")) || 0,
+    shelfLife: Number(fd.get("shelfLife")) || 24,
+    srpKrw: parseOptionalNumber(fd.get("srpKrw")),
+    srpUsd: parseOptionalNumber(fd.get("srpUsd")),
+    fobUsd: parseOptionalNumber(fd.get("fobUsd")),
+    fobRate:
+      parseOptionalNumber(fd.get("fobRate")) != null
+        ? parseOptionalNumber(fd.get("fobRate")) / 100
+        : null,
+    moq: Number(fd.get("moq")) || 50,
+  };
+}
+
+function syncProposalItemFromProduct(product) {
+  if (!proposalState.items[product.code]) {
+    proposalState.items[product.code] = { srpKrw: null, srpUsd: null, poQty: 0 };
+  }
+  proposalState.items[product.code].srpKrw = product.srpKrw ?? null;
+  proposalState.items[product.code].srpUsd = product.srpUsd ?? null;
+}
+
+function renderProductForm(editProduct = null) {
+  const isEdit = Boolean(editProduct);
+  const p = editProduct || {};
   return `
-    <div class="help-box no-print">
-      <span class="help-icon">📦</span>
-      <div>신규 제품이 출시되면 아래 양식을 작성하고 <strong>제품 추가</strong> 버튼을 누르세요. 추가된 제품은 단가표에 자동으로 나타납니다.</div>
-    </div>
     <div class="card no-print">
-      <div class="card-title">신규 제품 추가</div>
+      <div class="card-title">${isEdit ? `제품 수정 — ${p.code}` : "신규 제품 추가"}</div>
+      <div class="card-desc">${isEdit ? "변경 내용을 저장하면 단가표·발주서 기준 가격에도 반영됩니다." : "기준 소비자가를 입력해 두면 단가표 작성 시 자동으로 채워집니다."}</div>
       <form id="add-product-form" class="product-form">
         <div class="form-grid">
           <div class="form-group">
             <label>제품코드 *</label>
-            <input type="text" name="code" placeholder="Br-0015" required>
+            <input type="text" name="code" placeholder="Br-0015" required
+              value="${escapeAttr(p.code || "")}" ${isEdit ? "readonly class=\"input-readonly\"" : ""}>
           </div>
           <div class="form-group">
             <label>카테고리 *</label>
-            <input type="text" name="category" placeholder="Serum" required>
+            <input type="text" name="category" placeholder="Serum" required value="${escapeAttr(p.category || "")}">
           </div>
           <div class="form-group">
             <label>제품명 (KOR) *</label>
-            <input type="text" name="nameKor" placeholder="바를 ..." required>
+            <input type="text" name="nameKor" placeholder="바를 ..." required value="${escapeAttr(p.nameKor || "")}">
           </div>
           <div class="form-group">
             <label>제품명 (ENG) *</label>
-            <input type="text" name="nameEng" placeholder="Barle ..." required>
+            <input type="text" name="nameEng" placeholder="Barle ..." required value="${escapeAttr(p.nameEng || "")}">
           </div>
           <div class="form-group">
             <label>바코드</label>
-            <input type="text" name="barcode" placeholder="8800259230xxx">
+            <input type="text" name="barcode" placeholder="8800259230xxx" value="${escapeAttr(p.barcode || "")}">
           </div>
           <div class="form-group">
             <label>용량</label>
-            <input type="text" name="size" placeholder="50ml">
+            <input type="text" name="size" placeholder="50ml" value="${escapeAttr(p.size || "")}">
           </div>
           <div class="form-group">
             <label>박스입수량</label>
-            <input type="number" name="cartonQty" value="50" min="1">
+            <input type="number" name="cartonQty" value="${p.cartonQty ?? 50}" min="1">
           </div>
           <div class="form-group">
             <label>카톤박스 사이즈</label>
-            <input type="text" name="cartonSize" placeholder="46.5*24.2*19.5">
+            <input type="text" name="cartonSize" placeholder="46.5*24.2*19.5" value="${escapeAttr(p.cartonSize || "")}">
           </div>
           <div class="form-group">
             <label>CBM</label>
-            <input type="number" name="cbm" step="0.00001" value="0.02" min="0">
+            <input type="number" name="cbm" step="0.00001" value="${p.cbm ?? 0.02}" min="0">
           </div>
           <div class="form-group">
             <label>유통기한 (개월)</label>
-            <input type="number" name="shelfLife" value="24" min="1">
+            <input type="number" name="shelfLife" value="${p.shelfLife ?? 24}" min="1">
           </div>
           <div class="form-group">
-            <label>권장 소비자가 ($)</label>
-            <input type="number" name="srpUsd" step="0.01" min="0" placeholder="29.59">
+            <label>기준 소비자가 (₩)</label>
+            <input type="number" name="srpKrw" step="1" min="0" placeholder="39000"
+              value="${p.srpKrw ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>기준 소비자가 ($)</label>
+            <input type="number" name="srpUsd" step="0.01" min="0" placeholder="29.59"
+              value="${p.srpUsd ?? ""}">
           </div>
           <div class="form-group">
             <label>공급가 FOB ($)</label>
-            <input type="number" name="fobUsd" step="0.0001" min="0" placeholder="8.5811">
+            <input type="number" name="fobUsd" step="0.0001" min="0" placeholder="8.5811"
+              value="${p.fobUsd ?? ""}">
           </div>
           <div class="form-group">
             <label>공급가율 (%)</label>
-            <input type="number" name="fobRate" value="29" min="1" max="100" step="0.1">
+            <input type="number" name="fobRate" value="${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 : 29}" min="1" max="100" step="0.1">
           </div>
           <div class="form-group">
             <label>MOQ (CTN)</label>
-            <input type="number" name="moq" value="50" min="1">
+            <input type="number" name="moq" value="${p.moq ?? 50}" min="1">
           </div>
         </div>
-        <div style="margin-top:16px;display:flex;gap:8px">
-          <button type="submit" class="btn btn-primary btn-lg">+ 제품 추가</button>
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          <button type="submit" class="btn btn-primary btn-lg">${isEdit ? "💾 저장" : "+ 제품 추가"}</button>
+          ${isEdit ? `<button type="button" class="btn btn-secondary btn-lg" id="btn-cancel-edit-product">취소</button>` : ""}
         </div>
       </form>
+    </div>`;
+}
+
+function renderProducts() {
+  const products = getProducts(appData);
+  const editing = productEditCode
+    ? products.find((p) => p.code === productEditCode)
+    : null;
+
+  return `
+    <div class="help-box no-print">
+      <span class="help-icon">📦</span>
+      <div>
+        <strong>제품 등록 = 기준 가격</strong> · 여기 입력한 소비자가·FOB가 단가표·발주서 작성 시 자동으로 채워집니다.<br>
+        목록에서 <strong>수정</strong>을 눌러 내용을 변경할 수 있습니다.
+      </div>
     </div>
+    ${renderProductForm(editing)}
     <div class="card">
       <div class="card-title">등록된 제품 목록 (${products.length}개)</div>
       <div class="table-wrap">
@@ -1930,8 +1963,9 @@ function renderProducts() {
               <th>박스입수량</th>
               <th>CBM</th>
               <th>유통기한</th>
-              <th>권장 소비자가($)</th>
-              <th>공급가 FOB($)</th>
+              <th>기준가(₩)</th>
+              <th>기준가($)</th>
+              <th>FOB($)</th>
               <th>MOQ</th>
               <th class="no-print"></th>
             </tr>
@@ -1940,7 +1974,7 @@ function renderProducts() {
             ${products
               .map(
                 (p) => `
-              <tr>
+              <tr class="${productEditCode === p.code ? "row-editing" : ""}">
                 <td>${p.category}</td>
                 <td><code>${p.code}</code></td>
                 <td>${p.nameKor}</td>
@@ -1950,11 +1984,15 @@ function renderProducts() {
                 <td>${p.cartonQty}</td>
                 <td>${p.cbm}</td>
                 <td>${p.shelfLife}개월</td>
+                <td>${p.srpKrw != null ? formatKrw(p.srpKrw) : "—"}</td>
                 <td>${p.srpUsd != null ? formatUsd(p.srpUsd) : "—"}</td>
                 <td>${p.fobUsd != null ? formatUsd(p.fobUsd) : "—"}</td>
                 <td>${p.moq}</td>
                 <td class="no-print">
-                  <button class="btn btn-danger btn-sm" data-delete-code="${p.code}">삭제</button>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button class="btn btn-secondary btn-sm" data-edit-product="${p.code}">수정</button>
+                    <button class="btn btn-danger btn-sm" data-delete-code="${p.code}">삭제</button>
+                  </div>
                 </td>
               </tr>`
               )
@@ -1972,37 +2010,46 @@ function bindProductEvents() {
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      const product = {
-        code: fd.get("code").trim(),
-        category: fd.get("category").trim(),
-        nameKor: fd.get("nameKor").trim(),
-        nameEng: fd.get("nameEng").trim(),
-        barcode: fd.get("barcode").trim() || "",
-        size: fd.get("size").trim() || "",
-        cartonQty: Number(fd.get("cartonQty")) || 50,
-        cartonSize: fd.get("cartonSize").trim() || "",
-        cbm: Number(fd.get("cbm")) || 0,
-        shelfLife: Number(fd.get("shelfLife")) || 24,
-        srpUsd: parseOptionalNumber(fd.get("srpUsd")),
-        fobUsd: parseOptionalNumber(fd.get("fobUsd")),
-        fobRate: parseOptionalNumber(fd.get("fobRate")) != null
-          ? parseOptionalNumber(fd.get("fobRate")) / 100
-          : null,
-        moq: Number(fd.get("moq")) || 50,
-      };
+      const product = parseProductForm(fd);
+
+      if (productEditCode) {
+        const result = updateProduct(appData, productEditCode, product);
+        if (!result.ok) {
+          showToast(result.error);
+          return;
+        }
+        syncProposalItemFromProduct(result.product);
+        showToast(`제품 ${productEditCode} 수정됨`);
+        productEditCode = null;
+        render();
+        return;
+      }
+
       const result = addProduct(appData, product);
       if (!result.ok) {
         showToast(result.error);
         return;
       }
-      if (currentView === "proposal") {
-        proposalState.items[product.code] = { srpKrw: null, srpUsd: null, poQty: 0 };
-      }
+      syncProposalItemFromProduct(product);
       showToast(`제품 ${product.code} 추가됨`);
       form.reset();
       render();
     });
   }
+
+  document.getElementById("btn-cancel-edit-product")?.addEventListener("click", () => {
+    productEditCode = null;
+    render();
+  });
+
+  document.querySelectorAll("[data-edit-product]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      productEditCode = btn.dataset.editProduct;
+      render();
+      document.getElementById("add-product-form")?.scrollIntoView({ behavior: "smooth" });
+    });
+  });
+
   document.querySelectorAll("[data-delete-code]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const code = btn.dataset.deleteCode;
@@ -2012,6 +2059,7 @@ function bindProductEvents() {
         showToast(result.error);
         return;
       }
+      if (productEditCode === code) productEditCode = null;
       delete proposalState.items[code];
       showToast(`제품 ${code} 삭제됨`);
       render();
@@ -2399,109 +2447,6 @@ function bindMasterDeleteHandlers() {
       if (masterEditClientId === id) masterEditClientId = null;
       if (proposalState.clientName === name) proposalState.clientName = "";
       showToast(`업체 "${name}" 삭제됨`);
-      render();
-    });
-  });
-}
-
-function renderSrpMatrix() {
-  const products = getProducts(appData);
-  return `
-    <div class="help-box no-print">
-      <span class="help-icon">💰</span>
-      <div>국가별 <strong>권장 소비자가</strong>를 미리 입력해 두면, 단가표 작성 시 자동으로 채워집니다. ₩ 또는 $ 중 하나만 입력해도 됩니다.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">국가별 소비자가</div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th rowspan="2">제품코드</th>
-              <th rowspan="2">제품명</th>
-              ${getChannelList().map((ch) => `<th colspan="2">${ch.name}</th>`).join("")}
-              <th rowspan="2" class="no-print">삭제</th>
-            </tr>
-            <tr>
-              ${getChannelList().map(() => `<th>SRP (₩)</th><th>SRP ($)</th>`).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${products.map((p) => {
-              return `
-              <tr>
-                <td><code>${p.code}</code></td>
-                <td>${p.nameKor}</td>
-                ${getChannelList().map((ch) => {
-                  const srp = getChannelSrp(appData, p.code, ch.id);
-                  return `
-                  <td>
-                    <input type="number" step="1" min="0" placeholder="미입력"
-                      data-srp-code="${p.code}" data-srp-channel="${ch.id}" data-srp-type="krw"
-                      value="${srp.krw ?? ""}">
-                  </td>
-                  <td>
-                    <input type="number" step="0.01" min="0" placeholder="미입력"
-                      data-srp-code="${p.code}" data-srp-channel="${ch.id}" data-srp-type="usd"
-                      value="${srp.usd ?? ""}">
-                  </td>`;
-                }).join("")}
-                <td class="no-print">
-                  <button class="btn btn-danger btn-sm" data-delete-srp="${p.code}" data-product-name="${p.nameKor}">삭제</button>
-                </td>
-              </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-function bindSrpEvents() {
-  document.querySelectorAll("[data-srp-code]").forEach((input) => {
-    input.addEventListener("change", (e) => {
-      const code = e.target.dataset.srpCode;
-      const channelId = e.target.dataset.srpChannel;
-      const type = e.target.dataset.srpType;
-      const current = getChannelSrp(appData, code, channelId);
-      const value = parseOptionalNumber(e.target.value);
-      if (type === "krw") {
-        setChannelSrp(appData, code, channelId, value, current.usd);
-      } else {
-        setChannelSrp(appData, code, channelId, current.krw, value);
-      }
-      saveData(appData);
-      if (proposalState.channelId === channelId && proposalState.items[code]) {
-        const updated = getChannelSrp(appData, code, channelId);
-        proposalState.items[code].srpKrw = updated.krw;
-        proposalState.items[code].srpUsd = updated.usd;
-      }
-      showToast("SRP 저장됨");
-    });
-  });
-
-  document.querySelectorAll("[data-delete-srp]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const code = btn.dataset.deleteSrp;
-      const name = btn.dataset.productName;
-      if (
-        !(await confirmDelete(
-          "소비자가 삭제",
-          `제품: ${name}\n제품코드: ${code}\n※ 모든 국가의 소비자가가 삭제됩니다`
-        ))
-      )
-        return;
-      const result = clearSrpForProduct(appData, code);
-      if (!result.ok) {
-        showToast(result.error);
-        return;
-      }
-      if (proposalState.items[code]) {
-        proposalState.items[code].srpKrw = null;
-        proposalState.items[code].srpUsd = null;
-      }
-      showToast("소비자가가 삭제되었습니다");
       render();
     });
   });

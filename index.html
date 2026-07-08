@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <script>
       (function () {
-        window.APP_BUILD = "2026-07-09-v24";
+        window.APP_BUILD = "2026-07-09-v25";
         var key = "barle-app-build";
         var saved = localStorage.getItem(key);
         if (saved !== window.APP_BUILD) {
@@ -37,7 +37,7 @@
         });
       })();
     </script>
-    <link rel="stylesheet" href="css/styles.css?v=24" />
+    <link rel="stylesheet" href="css/styles.css?v=25" />
   </head>
   <body>
     <aside class="sidebar" id="sidebar">
@@ -104,7 +104,7 @@
               <span class="nav-icon">📦</span>
               <span class="nav-text">
                 <strong>제품 등록</strong>
-                <small>품목 · 가격 정보</small>
+                <small>품목 · 기준 가격</small>
               </span>
             </button>
             <button class="nav-item nav-item-data" data-view="master" type="button" onclick="setView('master')">
@@ -112,13 +112,6 @@
               <span class="nav-text">
                 <strong>거래처 통합 등록</strong>
                 <small>국가 · 업체 · 거래조건</small>
-              </span>
-            </button>
-            <button class="nav-item nav-item-data" data-view="srp">
-              <span class="nav-icon">💰</span>
-              <span class="nav-text">
-                <strong>소비자가 설정</strong>
-                <small>국가별 권장가 (선택)</small>
               </span>
             </button>
           </div>
@@ -215,11 +208,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
-    <script src="js/data.js?v=24"></script>
-    <script src="js/store.js?v=24"></script>
-    <script src="js/poimport.js?v=24"></script>
-    <script src="js/app.js?v=24"></script>
-    <script src="js/proposal-pdf.js?v=24"></script>
-    <script src="js/excel.js?v=24"></script>
+    <script src="js/data.js?v=25"></script>
+    <script src="js/store.js?v=25"></script>
+    <script src="js/poimport.js?v=25"></script>
+    <script src="js/app.js?v=25"></script>
+    <script src="js/proposal-pdf.js?v=25"></script>
+    <script src="js/excel.js?v=25"></script>
   </body>
 </html>

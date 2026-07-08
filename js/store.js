@@ -126,16 +126,25 @@ function addProduct(data, product) {
   }
   data.products = [...products, product];
   initChannelSrpForProduct(data, product.code);
-  if (product.srpUsd != null) {
-    getChannels(data).forEach((ch) => {
-      const entry = data.channelSrp[product.code][ch.id];
-      if (entry && entry.usd == null) {
-        entry.usd = product.srpUsd;
-      }
-    });
-  }
   saveData(data);
   return { ok: true };
+}
+
+function updateProduct(data, code, updates) {
+  const products = getProducts(data);
+  const index = products.findIndex((p) => p.code === code);
+  if (index === -1) {
+    return { ok: false, error: "제품을 찾을 수 없습니다." };
+  }
+  const current = products[index];
+  const updated = {
+    ...current,
+    ...updates,
+    code: current.code,
+  };
+  data.products = [...products.slice(0, index), updated, ...products.slice(index + 1)];
+  saveData(data);
+  return { ok: true, product: updated };
 }
 
 function deleteProduct(data, code) {
