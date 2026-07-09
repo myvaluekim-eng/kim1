@@ -374,6 +374,19 @@ function saveOrder(data, order) {
   return { version, record };
 }
 
+function findDuplicateOrder(data, channelId, poNumber) {
+  const trimmed = String(poNumber || "").trim();
+  if (!trimmed) return null;
+  return (
+    data.proposals.find(
+      (p) =>
+        getRecordType(p) === "order" &&
+        p.channelId === channelId &&
+        String(p.poNumber || "").trim() === trimmed
+    ) || null
+  );
+}
+
 function getProposals(data, channelId) {
   if (!channelId) return data.proposals;
   return data.proposals.filter((p) => p.channelId === channelId);

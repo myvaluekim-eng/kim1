@@ -1732,22 +1732,32 @@ async function savePoUpload() {
   const totalAmount = items.reduce((s, i) => s + (i.amount || 0), 0);
   const savedMonth = form.poDate.slice(0, 7);
   const savedChannelId = form.channelId;
+  const existingOrder = findDuplicateOrder(appData, form.channelId, form.poNumber);
 
   const confirmed = await confirmAction({
-    label: "발주 저장 확인",
+    label: existingOrder ? "중복 발주번호 확인" : "발주 저장 확인",
     title: `${form.buyerName} · ${channel.name}`,
     details: [
       `발주일: ${form.poDate}`,
       `발주번호: ${form.poNumber || "—"}`,
       `합계: ${formatMoney(totalAmount, channel)}`,
       `품목: ${items.length}건`,
+      existingOrder
+        ? `※ 이미 등록된 발주번호입니다. 저장하면 기존 발주(${formatMoney(existingOrder.totalAmount, channel)})를 덮어씁니다.`
+        : "",
     ],
-    warning: "저장하면 영업 현황(매출)에 반영됩니다. 업체명·국가가 맞는지 확인해주세요.",
-    confirmText: "저장",
+    warning: existingOrder
+      ? "같은 발주번호가 이미 저장되어 있어 매출이 중복 집계될 수 있습니다. 저장하면 기존 발주를 덮어씁니다. 새 발주라면 발주번호를 다르게 입력해주세요."
+      : "저장하면 영업 현황(매출)에 반영됩니다. 업체명·국가가 맞는지 확인해주세요.",
+    confirmText: existingOrder ? "덮어쓰기" : "저장",
     cancelText: "취소",
-    type: "restore",
+    type: existingOrder ? "delete" : "restore",
   });
   if (!confirmed) return;
+
+  if (existingOrder) {
+    deleteProposal(appData, existingOrder.id);
+  }
 
   const { version } = saveOrder(appData, {
     channelId: form.channelId,
