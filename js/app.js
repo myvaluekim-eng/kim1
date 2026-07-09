@@ -111,6 +111,18 @@ let proposalState = {
 
 let productEditCode = null;
 
+function freshProductUploadState() {
+  return {
+    fileName: "",
+    status: "idle",
+    statusMsg: "",
+    warning: "",
+    rows: [],
+  };
+}
+
+let productUploadState = freshProductUploadState();
+
 function freshPoUploadState() {
   return {
     channelId: "CN",
@@ -2075,6 +2087,288 @@ function renderProductForm(editProduct = null) {
     </div>`;
 }
 
+const PRODUCT_IMPORT_HEADERS = [
+  { key: "code", test: /제품코드|품번코드|^code$/i },
+  { key: "category", test: /카테고리|분류|^category$/i },
+  { key: "nameKor", test: /국문|한글|^namekor$|^name$/i },
+  { key: "nameEng", test: /영문|^nameeng$/i },
+  { key: "barcode", test: /바코드|^barcode$/i },
+  { key: "size", test: /용량|^size$/i },
+  { key: "cartonQty", test: /박스입수|카톤수량|^cartonqty$/i },
+  { key: "cartonSize", test: /카톤.*사이즈|박스.*사이즈|^cartonsize$/i },
+  { key: "cbm", test: /^cbm$/i },
+  { key: "shelfLife", test: /유통기한|^shelflife$/i },
+  { key: "srpKrw", test: /소비자가.*원|기준가.*원|^srpkrw$/i },
+  { key: "srpUsd", test: /소비자가.*\$|기준가.*\$|^srpusd$/i },
+  { key: "fobUsd", test: /fob.*\$|^fobusd$/i },
+  { key: "fobRate", test: /fob.*(율|rate)|^fobrate$/i },
+  { key: "moq", test: /^moq$/i },
+];
+
+function productImportNumber(text) {
+  if (!text) return null;
+  const n = Number(String(text).replace(/[^0-9.\-]/g, ""));
+  return isNaN(n) ? null : n;
+}
+
+function parseProductMatrix(matrix) {
+  const compact = (v) => String(v || "").replace(/\s/g, "");
+  let headerRowIdx = -1;
+  let colMap = {};
+
+  for (let i = 0; i < Math.min(matrix.length, 20); i++) {
+    const found = {};
+    (matrix[i] || []).forEach((cell, idx) => {
+      const text = compact(cell);
+      if (!text) return;
+      for (const def of PRODUCT_IMPORT_HEADERS) {
+        if (def.test.test(text) && found[def.key] == null) {
+          found[def.key] = idx;
+          break;
+        }
+      }
+    });
+    if (found.code != null && found.nameKor != null && Object.keys(found).length > Object.keys(colMap).length) {
+      headerRowIdx = i;
+      colMap = found;
+    }
+  }
+
+  if (headerRowIdx === -1) {
+    return { rows: [], warning: "제품코드·제품명 열을 찾지 못했습니다. 표 형식을 확인해주세요." };
+  }
+
+  const rows = [];
+  for (let r = headerRowIdx + 1; r < matrix.length; r++) {
+    const row = matrix[r] || [];
+    const cell = (key) => (colMap[key] != null ? String(row[colMap[key]] ?? "").trim() : "");
+    const code = cell("code");
+    const nameKor = cell("nameKor");
+    if (!code && !nameKor) continue;
+    rows.push({
+      code,
+      category: cell("category") || "기타",
+      nameKor,
+      nameEng: cell("nameEng"),
+      barcode: cell("barcode"),
+      size: cell("size"),
+      cartonQty: productImportNumber(cell("cartonQty")) || 50,
+      cartonSize: cell("cartonSize"),
+      cbm: productImportNumber(cell("cbm")) || 0,
+      shelfLife: productImportNumber(cell("shelfLife")) || 24,
+      srpKrw: productImportNumber(cell("srpKrw")),
+      srpUsd: productImportNumber(cell("srpUsd")),
+      fobUsd: productImportNumber(cell("fobUsd")),
+      fobRate: cell("fobRate") ? productImportNumber(cell("fobRate")) / 100 : null,
+      moq: productImportNumber(cell("moq")) || 50,
+    });
+  }
+
+  return { rows, warning: rows.length ? null : "제품 데이터를 찾지 못했습니다. 표 형식을 확인해주세요." };
+}
+
+function parseProductExcelFile(file) {
+  return new Promise((resolve, reject) => {
+    if (typeof XLSX === "undefined") {
+      reject(new Error("엑셀 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해주세요."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("파일을 읽지 못했습니다."));
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+        let best = null;
+        wb.SheetNames.forEach((sheetName) => {
+          const ws = wb.Sheets[sheetName];
+          const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+          const parsed = parseProductMatrix(matrix);
+          if (!best || parsed.rows.length > best.rows.length) best = parsed;
+        });
+        resolve(best || { rows: [], warning: "표 데이터를 찾지 못했습니다." });
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function handleProductFile(file) {
+  productUploadState.fileName = file.name;
+  productUploadState.status = "parsing";
+  productUploadState.statusMsg = "";
+  productUploadState.warning = "";
+  render();
+
+  parseProductExcelFile(file)
+    .then((parsed) => {
+      productUploadState.rows = parsed.rows;
+      productUploadState.warning = parsed.warning || "";
+      productUploadState.status = "done";
+      render();
+    })
+    .catch((err) => {
+      productUploadState.status = "error";
+      productUploadState.statusMsg = err.message || "파일을 인식하지 못했습니다.";
+      render();
+    });
+}
+
+function renderProductImportRow(r, i) {
+  const isDuplicate = getProducts(appData).some((p) => p.code === r.code);
+  return `
+    <tr data-row-index="${i}" class="${isDuplicate ? "po-row-unmatched" : ""}">
+      <td class="editable"><input class="input-cell" type="text" data-pi-field="code" data-row-index="${i}" value="${escapeAttr(r.code)}"></td>
+      <td class="editable"><input class="input-cell" type="text" data-pi-field="category" data-row-index="${i}" value="${escapeAttr(r.category)}"></td>
+      <td class="editable"><input class="input-cell" type="text" data-pi-field="nameKor" data-row-index="${i}" value="${escapeAttr(r.nameKor)}"></td>
+      <td class="editable"><input class="input-cell" type="text" data-pi-field="nameEng" data-row-index="${i}" value="${escapeAttr(r.nameEng)}"></td>
+      <td class="editable"><input class="input-cell" type="text" data-pi-field="barcode" data-row-index="${i}" value="${escapeAttr(r.barcode)}"></td>
+      <td class="editable"><input class="input-cell" type="text" data-pi-field="size" data-row-index="${i}" value="${escapeAttr(r.size)}"></td>
+      <td class="editable"><input class="input-cell" type="number" data-pi-field="srpKrw" data-row-index="${i}" value="${r.srpKrw ?? ""}"></td>
+      <td class="editable"><input class="input-cell" type="number" step="0.01" data-pi-field="srpUsd" data-row-index="${i}" value="${r.srpUsd ?? ""}"></td>
+      <td>${isDuplicate ? `<span class="po-hint-warn">기존 코드</span>` : ""}</td>
+      <td class="no-print"><button class="btn btn-danger btn-sm" data-pi-remove-row="${i}">삭제</button></td>
+    </tr>
+  `;
+}
+
+function renderProductUploadSection() {
+  const rows = productUploadState.rows;
+  const duplicateCount = rows.filter((r) => getProducts(appData).some((p) => p.code === r.code)).length;
+  return `
+    <div class="card no-print">
+      <div class="card-title">파일로 일괄 등록</div>
+      <div class="card-desc">엑셀(.xlsx, .xls, .csv) 파일을 올리면 제품코드·제품명 등 열을 자동으로 인식합니다.</div>
+      <div class="po-dropzone" id="product-dropzone">
+        <input type="file" id="product-file-input" accept=".xlsx,.xls,.csv" hidden>
+        <div class="po-dropzone-icon">📎</div>
+        <p><strong>클릭하거나 파일을 끌어다 놓으세요</strong></p>
+        <p class="po-dropzone-sub">엑셀(.xlsx, .xls, .csv)</p>
+        ${productUploadState.fileName ? `<p class="po-dropzone-file">📄 ${escapeAttr(productUploadState.fileName)}</p>` : ""}
+      </div>
+      ${
+        productUploadState.status === "parsing"
+          ? `<div class="po-status po-status-parsing">인식 중...</div>`
+          : ""
+      }
+      ${productUploadState.status === "error" ? `<div class="po-status po-status-error">⚠️ ${escapeAttr(productUploadState.statusMsg)}</div>` : ""}
+      ${productUploadState.warning ? `<div class="po-status po-status-warn">⚠️ ${escapeAttr(productUploadState.warning)}</div>` : ""}
+      ${
+        rows.length
+          ? `
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>제품코드</th>
+              <th>카테고리</th>
+              <th>제품명(국문)</th>
+              <th>제품명(영문)</th>
+              <th>바코드</th>
+              <th>용량</th>
+              <th>기준가(₩)</th>
+              <th>기준가($)</th>
+              <th></th>
+              <th class="no-print"></th>
+            </tr>
+          </thead>
+          <tbody id="product-import-body">
+            ${rows.map((r, i) => renderProductImportRow(r, i)).join("")}
+          </tbody>
+        </table>
+      </div>
+      ${duplicateCount ? `<p class="field-hint po-hint-warn" style="margin-top:8px">이미 등록된 제품코드 ${duplicateCount}건은 등록 시 건너뜁니다.</p>` : ""}
+      <div style="display:flex;justify-content:flex-end;margin-top:16px">
+        <button class="btn btn-success btn-lg" id="btn-import-products">💾 ${rows.length}건 일괄 등록</button>
+      </div>
+      `
+          : ""
+      }
+    </div>
+  `;
+}
+
+function bindProductUploadEvents() {
+  const dropzone = document.getElementById("product-dropzone");
+  const fileInput = document.getElementById("product-file-input");
+  if (dropzone && fileInput) {
+    dropzone.addEventListener("click", () => fileInput.click());
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+      const file = e.dataTransfer.files?.[0];
+      if (file) handleProductFile(file);
+    });
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if (file) handleProductFile(file);
+    });
+  }
+
+  document.querySelectorAll("[data-pi-field]").forEach((el) => {
+    el.addEventListener("input", (e) => {
+      const idx = parseInt(e.target.dataset.rowIndex, 10);
+      const field = e.target.dataset.piField;
+      const row = productUploadState.rows[idx];
+      if (!row) return;
+      row[field] = field === "srpKrw" || field === "srpUsd" ? parseOptionalNumber(e.target.value) : e.target.value;
+      if (field === "code") render();
+    });
+  });
+
+  document.querySelectorAll("[data-pi-remove-row]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.piRemoveRow, 10);
+      productUploadState.rows.splice(idx, 1);
+      render();
+    });
+  });
+
+  document.getElementById("btn-import-products")?.addEventListener("click", () => {
+    const existingCodes = new Set(getProducts(appData).map((p) => p.code));
+    let added = 0;
+    let skipped = 0;
+    productUploadState.rows.forEach((r) => {
+      if (!r.code?.trim() || !r.nameKor?.trim() || existingCodes.has(r.code)) {
+        skipped++;
+        return;
+      }
+      const result = addProduct(appData, {
+        code: r.code.trim(),
+        category: r.category?.trim() || "기타",
+        nameKor: r.nameKor.trim(),
+        nameEng: r.nameEng?.trim() || "",
+        barcode: r.barcode?.trim() || "",
+        size: r.size?.trim() || "",
+        cartonQty: r.cartonQty || 50,
+        cartonSize: r.cartonSize?.trim() || "",
+        cbm: r.cbm || 0,
+        shelfLife: r.shelfLife || 24,
+        srpKrw: r.srpKrw ?? null,
+        srpUsd: r.srpUsd ?? null,
+        fobUsd: r.fobUsd ?? null,
+        fobRate: r.fobRate ?? 0.29,
+        moq: r.moq || 50,
+      });
+      if (result.ok) {
+        added++;
+        existingCodes.add(r.code);
+      } else {
+        skipped++;
+      }
+    });
+    showToast(`${added}개 제품이 등록되었습니다${skipped ? ` · ${skipped}건 건너뜀` : ""}`);
+    productUploadState = freshProductUploadState();
+    render();
+  });
+}
+
 function renderProducts() {
   const products = getProducts(appData);
   const editing = productEditCode
@@ -2090,6 +2384,7 @@ function renderProducts() {
       </div>
     </div>
     ${renderProductForm(editing)}
+    ${renderProductUploadSection()}
     <div class="card">
       <div class="card-title">등록된 제품 목록 (${products.length}개)</div>
       <div class="table-wrap">
@@ -2147,6 +2442,7 @@ function renderProducts() {
 }
 
 function bindProductEvents() {
+  bindProductUploadEvents();
   const form = document.getElementById("add-product-form");
   if (form) {
     form.addEventListener("submit", (e) => {
