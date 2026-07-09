@@ -53,6 +53,14 @@ function poExtractPoDate(text) {
   return null;
 }
 
+function poDetectCurrency(text) {
+  const t = String(text || "");
+  if (/₩|\bKRW\b|\bWONS?\b/i.test(t)) return "KRW";
+  if (/\$|\bUSD\b/i.test(t)) return "USD";
+  if (/¥|\bJPY\b/i.test(t)) return "JPY";
+  return null;
+}
+
 function isOliveYoungPoText(text) {
   const compact = poCompact(text);
   return (
@@ -535,6 +543,7 @@ function parsePoMatrix(matrix) {
     poDate: poExtractPoDate(allText),
     rows,
     isOliveYoung: isOliveYoungPoText(allText),
+    currency: poDetectCurrency(allText),
     warning: rows.length ? null : "품명·발주수량·단가·금액을 찾지 못했습니다. 아래 표에 직접 입력해주세요.",
   };
 }
@@ -798,6 +807,7 @@ function poFinalizeParseResult(parsed, fullText) {
     parsed.warning =
       "올리브영 발주서로 확인되지만 품목을 읽지 못했습니다. 아래 표에 직접 입력해주세요.";
   }
+  parsed.currency = parsed.currency || poDetectCurrency(fullText);
   parsed.rawText = fullText;
   return parsed;
 }
@@ -922,6 +932,7 @@ function parsePoFromPlainText(text) {
     poDate: poExtractPoDate(text),
     rows,
     isOliveYoung: isOliveYoungPoText(text),
+    currency: poDetectCurrency(text),
     warning: rows.length
       ? "인식 결과입니다. 품명·수량·단가·금액을 확인해주세요."
       : "자동 인식에 실패했습니다. 아래 표에 직접 입력하거나 엑셀 파일을 업로드해주세요.",

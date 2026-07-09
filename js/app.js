@@ -125,6 +125,7 @@ function freshPoUploadState() {
     manualSelected: [],
     manualItems: {},
     manualPriceCurrency: "USD",
+    detectedCurrency: null,
     status: "idle",
     statusMsg: "",
     warning: "",
@@ -209,7 +210,7 @@ function formatJpy(value) {
 
 function formatUsd(value) {
   if (value == null) return "—";
-  return "$" + value.toFixed(2);
+  return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatMoney(value, channel) {
@@ -1209,16 +1210,25 @@ function mapParsedPoRows(rows) {
   });
 }
 
+function getPoFileDisplayCurrency(channel) {
+  return poUploadState.detectedCurrency || channel.currency;
+}
+
 function renderPoReviewSection(channel, rows) {
   const totalAmount = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
+  const displayCurrency = getPoFileDisplayCurrency(channel);
   const buyerName = poUploadState.clientName?.trim() || "";
   const clientHint = buyerName
     ? `<p class="po-save-client-hint">저장 업체: <strong>${escapeAttr(buyerName)}</strong> · ${escapeAttr(channel.name)}</p>`
     : `<p class="po-save-client-hint po-save-client-warn">⚠️ 저장 전 업체를 선택하거나 + 신규로 등록해주세요</p>`;
+  const currencyHint = poUploadState.detectedCurrency
+    ? `<p class="po-save-client-hint">인식된 통화: <strong>${escapeAttr(poUploadState.detectedCurrency)}</strong> (₩/KRW·$/USD 표기를 기준으로 자동 인식)</p>`
+    : "";
   return `
     <div class="section-block">
       <div class="section-label">④ ${rows.length ? `인식 결과 (${rows.length}건)` : "품목 입력"}</div>
       ${clientHint}
+      ${currencyHint}
       <div class="table-wrap">
         <table class="po-review-table">
           <thead>
@@ -1237,7 +1247,7 @@ function renderPoReviewSection(channel, rows) {
           <tfoot>
             <tr>
               <td colspan="4" style="text-align:right;font-weight:700">합계</td>
-              <td class="total-row" id="po-total-amount">${formatMoney(totalAmount, channel)}</td>
+              <td class="total-row" id="po-total-amount">${formatByCurrency(totalAmount, displayCurrency)}</td>
               <td></td>
             </tr>
           </tfoot>
@@ -1600,6 +1610,7 @@ function handlePoFile(file) {
     poUploadState.rows = mapParsedPoRows(parsed.rows);
     if (parsed.poNumber) poUploadState.poNumber = parsed.poNumber;
     if (parsed.poDate) poUploadState.poDate = parsed.poDate;
+    poUploadState.detectedCurrency = parsed.currency || null;
     if (parsed.isOliveYoung) {
       const oliveChannel = getChannelList().find((c) => c.id === "KR-OLIVE" || c.name === "올리브영");
       if (oliveChannel) poUploadState.channelId = oliveChannel.id;
@@ -1649,7 +1660,7 @@ function updatePoTotals() {
   const channel = findChannel(poUploadState.channelId);
   const totalAmount = poUploadState.rows.reduce((s, r) => s + (r.amount ?? 0), 0);
   const el = document.getElementById("po-total-amount");
-  if (el) el.textContent = formatMoney(totalAmount, channel);
+  if (el) el.textContent = formatByCurrency(totalAmount, getPoFileDisplayCurrency(channel));
 }
 
 function updatePoSaveClientHint() {
@@ -1685,6 +1696,7 @@ async function savePoUpload() {
   const products = getProducts(appData);
   let items = [];
   let source = "po-upload";
+  let filePriceCurrency = poUploadState.detectedCurrency || channel.currency;
 
   if (poUploadState.mode === "manual") {
     const currency = poUploadState.manualPriceCurrency;
@@ -1728,7 +1740,7 @@ async function savePoUpload() {
       const qty = r.qty;
       const unitPrice = r.unitPrice;
       const amount = r.amount ?? (unitPrice != null ? unitPrice * qty : 0);
-      const currency = channel.currency;
+      const currency = filePriceCurrency;
       const matchedProduct = r.matchedCode ? products.find((p) => p.code === r.matchedCode) : null;
       return {
         productCode: matchedProduct ? matchedProduct.code : `PO-${Date.now()}-${idx}`,
@@ -1750,6 +1762,7 @@ async function savePoUpload() {
   const savedMonth = form.poDate.slice(0, 7);
   const savedChannelId = form.channelId;
   const existingOrder = findDuplicateOrder(appData, form.channelId, form.poNumber);
+  const displayCurrency = poUploadState.mode === "manual" ? poUploadState.manualPriceCurrency : filePriceCurrency;
 
   const confirmed = await confirmAction({
     label: existingOrder ? "중복 발주번호 확인" : "발주 저장 확인",
@@ -1757,10 +1770,10 @@ async function savePoUpload() {
     details: [
       `발주일: ${form.poDate}`,
       `발주번호: ${form.poNumber || "—"}`,
-      `합계: ${formatMoney(totalAmount, channel)}`,
+      `합계: ${formatByCurrency(totalAmount, displayCurrency)}`,
       `품목: ${items.length}건`,
       existingOrder
-        ? `※ 이미 등록된 발주번호입니다. 저장하면 기존 발주(${formatMoney(existingOrder.totalAmount, channel)})를 덮어씁니다.`
+        ? `※ 이미 등록된 발주번호입니다. 저장하면 기존 발주(${formatProposalMoney(existingOrder.totalAmount, existingOrder, channel)})를 덮어씁니다.`
         : "",
     ],
     warning: existingOrder
@@ -1784,7 +1797,7 @@ async function savePoUpload() {
     poNumber: form.poNumber,
     fobRate: 0,
     exchangeRate: appData.exchangeRate,
-    priceCurrency: poUploadState.mode === "manual" ? poUploadState.manualPriceCurrency : channel.currency,
+    priceCurrency: poUploadState.mode === "manual" ? poUploadState.manualPriceCurrency : filePriceCurrency,
     items,
     totalAmount,
     terms,
