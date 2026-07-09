@@ -1777,10 +1777,13 @@ async function savePoUpload() {
     sourceFileName: poUploadState.fileName,
   });
 
-  showToast(`발주서가 저장되었습니다 — v${version} · ${form.buyerName} (영업 현황 반영)`);
+  const savedMonthLabel = `${savedMonth.slice(0, 4)}년 ${parseInt(savedMonth.slice(5, 7))}월`;
+  showToast(`발주서가 저장되었습니다 — v${version} · ${form.buyerName} (${savedMonthLabel} 영업 현황 반영)`);
   poUploadState = freshPoUploadState();
-  salesMonth = savedMonth;
-  salesChannelId = savedChannelId;
+  // 기존에 보고 있던 월·채널 필터는 유지한다. 저장된 발주의 월이 다르면
+  // 화면이 그 월로 튀면서 다른 월의 기존 발주가 사라진 것처럼 보이는
+  // 문제가 있었기 때문에, 필터는 그대로 두고 토스트로만 안내한다.
+  if (!salesMonth) salesMonth = savedMonth;
   setView("sales");
 }
 
