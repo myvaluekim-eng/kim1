@@ -56,9 +56,8 @@ function poExtractPoDate(text) {
 function isOliveYoungPoText(text) {
   const compact = poCompact(text);
   return (
-    /구매발주서|홍천엠앤티|올리브영/.test(compact) ||
-    /P0\d{10}/i.test(compact) ||
-    /발주번호/.test(compact) ||
+    /홍천엠앤티|올리브영/.test(compact) ||
+    /발주번호[:：]?P0\d{10}/i.test(compact) ||
     /비고.*OY|OY.*입고/.test(compact)
   );
 }

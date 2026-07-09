@@ -116,7 +116,6 @@ function freshPoUploadState() {
     channelId: "CN",
     clientId: "",
     clientName: "",
-    buyerName: "",
     poDate: new Date().toISOString().slice(0, 10),
     poNumber: "",
     fileName: "",
@@ -799,22 +798,21 @@ function resolveClientFromSelect(channelId, selectValue, fallbackName) {
 
 function readPoFormFromDom() {
   const channelId = document.getElementById("po-channel-select")?.value?.trim() || "";
-  const buyerName = document.getElementById("po-buyer-name")?.value?.trim() || "";
-  const clientId = document.getElementById("po-client-select")?.value?.trim() || "";
+  const clientSelect = document.getElementById("po-client-select");
+  const legacyName = clientSelect?.selectedOptions?.[0]?.dataset?.legacyName || "";
+  const resolved = resolveClientFromSelect(channelId, clientSelect?.value?.trim() || "", legacyName);
   const poDate = document.getElementById("po-date")?.value || "";
   const poNumber = document.getElementById("po-number")?.value?.trim() || "";
 
   if (!channelId) return { error: "판매 국가를 선택해주세요" };
-  if (!buyerName) return { error: "업체명을 입력해주세요" };
+  if (!resolved.clientName) return { error: "업체를 선택하거나 + 신규로 등록해주세요" };
   if (!poDate) return { error: "발주일을 입력해주세요" };
-
-  const client = clientId ? getClients(appData, channelId).find((c) => c.id === clientId) : null;
 
   return {
     channelId,
-    buyerName,
-    clientId: client?.id || null,
-    clientName: buyerName,
+    buyerName: resolved.clientName,
+    clientId: resolved.clientId || null,
+    clientName: resolved.clientName,
     poDate,
     poNumber,
   };
@@ -1204,10 +1202,10 @@ function mapParsedPoRows(rows) {
 
 function renderPoReviewSection(channel, rows) {
   const totalAmount = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
-  const buyerName = poUploadState.buyerName?.trim() || poUploadState.clientName?.trim() || "";
+  const buyerName = poUploadState.clientName?.trim() || "";
   const clientHint = buyerName
     ? `<p class="po-save-client-hint">저장 업체: <strong>${escapeAttr(buyerName)}</strong> · ${escapeAttr(channel.name)}</p>`
-    : `<p class="po-save-client-hint po-save-client-warn">⚠️ 저장 전 업체명을 입력해주세요</p>`;
+    : `<p class="po-save-client-hint po-save-client-warn">⚠️ 저장 전 업체를 선택하거나 + 신규로 등록해주세요</p>`;
   return `
     <div class="section-block">
       <div class="section-label">④ ${rows.length ? `인식 결과 (${rows.length}건)` : "품목 입력"}</div>
@@ -1497,25 +1495,23 @@ function renderPoUpload() {
 
     <div class="section-block no-print">
       <div class="section-label">① 국가·업체 입력</div>
-      <div class="form-row">
+      <div class="form-row po-meta-row">
         <div class="form-group">
           <label>판매 국가</label>
           <select id="po-channel-select">${renderChannelOptions(poUploadState.channelId)}</select>
         </div>
         <div class="form-group form-group-client">
           <label>업체명 <span class="required">*</span></label>
-          <input type="text" id="po-buyer-name" placeholder="예: 올리브영, 무신사" value="${escapeAttr(poUploadState.buyerName || poUploadState.clientName || "")}">
-          <div class="input-with-action" style="margin-top:8px">
+          <div class="input-with-action">
             <select id="po-client-select">
               ${getClientSelectOptions(poUploadState.channelId, poUploadState.clientId, poUploadState.clientName)}
             </select>
             <button type="button" class="btn btn-secondary" id="po-btn-quick-client">+ 신규</button>
           </div>
-          <span class="field-hint">업체명을 직접 입력하거나, 아래 목록에서 선택해 자동 입력할 수 있습니다.</span>
           ${
             channelClients.length === 0
               ? `<span class="field-hint">등록된 업체가 없습니다. <strong>+ 신규</strong> 버튼으로 추가하세요.</span>`
-              : ""
+              : `<span class="field-hint">목록에서 업체를 선택하세요. 없으면 <strong>+ 신규</strong>로 등록하세요.</span>`
           }
         </div>
         <div class="form-group">
@@ -1583,7 +1579,11 @@ function handlePoFile(file) {
     if (parsed.isOliveYoung) {
       const oliveChannel = getChannelList().find((c) => c.id === "KR-OLIVE" || c.name === "올리브영");
       if (oliveChannel) poUploadState.channelId = oliveChannel.id;
-      if (!poUploadState.buyerName?.trim()) poUploadState.buyerName = "올리브영";
+      if (!poUploadState.clientName?.trim()) {
+        const oliveClient = getClients(appData, poUploadState.channelId).find((c) => c.name === "올리브영");
+        poUploadState.clientId = oliveClient?.id || "";
+        poUploadState.clientName = "올리브영";
+      }
     }
     poUploadState.warning = parsed.warning || "";
     if (!poUploadState.rows.length && (poUploadState.fileKind === "image" || poUploadState.fileKind === "pdf")) {
@@ -1632,14 +1632,14 @@ function updatePoSaveClientHint() {
   const hint = document.querySelector(".po-save-client-hint");
   if (!hint) return;
   const channelId = document.getElementById("po-channel-select")?.value || poUploadState.channelId;
-  const buyerName = document.getElementById("po-buyer-name")?.value?.trim() || poUploadState.buyerName?.trim() || "";
   const channel = findChannel(channelId);
+  const buyerName = poUploadState.clientName?.trim() || "";
   if (buyerName) {
     hint.className = "po-save-client-hint";
     hint.innerHTML = `저장 업체: <strong>${escapeAttr(buyerName)}</strong> · ${escapeAttr(channel.name)}`;
   } else {
     hint.className = "po-save-client-hint po-save-client-warn";
-    hint.textContent = "⚠️ 저장 전 업체명을 입력해주세요";
+    hint.textContent = "⚠️ 저장 전 업체를 선택하거나 + 신규로 등록해주세요";
   }
 }
 
@@ -1653,7 +1653,6 @@ async function savePoUpload() {
   poUploadState.channelId = form.channelId;
   poUploadState.clientId = form.clientId || "";
   poUploadState.clientName = form.buyerName;
-  poUploadState.buyerName = form.buyerName;
   poUploadState.poDate = form.poDate;
   poUploadState.poNumber = form.poNumber;
 
@@ -1782,7 +1781,6 @@ function bindPoUploadEvents() {
     poUploadState.channelId = e.target.value;
     poUploadState.clientId = "";
     poUploadState.clientName = "";
-    poUploadState.buyerName = "";
     if (poUploadState.mode === "manual") {
       poUploadState.manualSelected = [];
       poUploadState.manualItems = {};
@@ -1836,24 +1834,15 @@ function bindPoUploadEvents() {
     });
   });
 
-  document.getElementById("po-buyer-name")?.addEventListener("input", (e) => {
-    poUploadState.buyerName = e.target.value;
-    updatePoSaveClientHint();
-  });
-
   const clientSelect = document.getElementById("po-client-select");
   if (clientSelect) {
     clientSelect.addEventListener("change", (e) => {
       const channelId = document.getElementById("po-channel-select")?.value || poUploadState.channelId;
-      const resolved = resolveClientFromSelect(channelId, e.target.value, "");
+      const legacyName = e.target.selectedOptions?.[0]?.dataset?.legacyName || "";
+      const resolved = resolveClientFromSelect(channelId, e.target.value, legacyName);
       poUploadState.channelId = channelId;
       poUploadState.clientId = resolved.clientId;
       poUploadState.clientName = resolved.clientName;
-      if (resolved.clientName) {
-        poUploadState.buyerName = resolved.clientName;
-        const buyerInput = document.getElementById("po-buyer-name");
-        if (buyerInput) buyerInput.value = resolved.clientName;
-      }
       updatePoSaveClientHint();
     });
   }
@@ -1863,7 +1852,6 @@ function bindPoUploadEvents() {
       poUploadState.channelId = channelId;
       poUploadState.clientId = clientId || "";
       poUploadState.clientName = name;
-      poUploadState.buyerName = name;
       render();
     });
   });

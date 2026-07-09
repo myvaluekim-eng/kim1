@@ -786,6 +786,10 @@ body {
   margin-bottom: 20px;
 }
 
+.po-meta-row {
+  align-items: flex-start;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
