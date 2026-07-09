@@ -1150,6 +1150,35 @@ body {
   color: #92400e;
 }
 
+.sales-order-client-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+  font-size: 13px;
+}
+
+.sales-order-client-edit label {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.sales-order-client-edit .sales-client-edit-input {
+  min-width: 160px;
+  flex: 1;
+}
+
+.link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
 .po-empty-hint {
   text-align: center;
   color: var(--text-muted);

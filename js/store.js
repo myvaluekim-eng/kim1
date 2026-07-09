@@ -392,28 +392,61 @@ function orderMatchesClient(proposal, client) {
   return proposal.clientName === client.name;
 }
 
-function getSalesClientKey(proposal) {
-  const name = String(proposal.clientName || "").trim() || "미지정";
-  return `${proposal.channelId}::${name}`;
+function normalizeSalesClientName(name, channel) {
+  const n = String(name || "").trim();
+  if (!n) return "";
+  if (channel?.name && n === channel.name) return "";
+  if (channel?.id && n === channel.id) return "";
+  return n;
 }
 
-function getSalesClientLabel(proposal) {
-  return String(proposal.clientName || "").trim() || "미지정";
+function getOrderClientName(proposal, channel) {
+  return normalizeSalesClientName(proposal.salesClientName || proposal.clientName, channel);
+}
+
+function getSalesClientKey(proposal, channel) {
+  const ch = channel || null;
+  const name = getOrderClientName(proposal, ch);
+  if (name) return `${proposal.channelId}::${name}`;
+  const tag = String(proposal.poNumber || "").trim() || proposal.id;
+  return `${proposal.channelId}::__order__::${tag}`;
+}
+
+function getSalesClientLabel(proposal, channel) {
+  const name = getOrderClientName(proposal, channel);
+  if (name) return name;
+  if (proposal.poNumber) return `발주 ${proposal.poNumber}`;
+  return `발주 v${proposal.version}`;
+}
+
+function updateOrderClientName(data, orderId, clientName) {
+  const order = data.proposals.find((p) => p.id === orderId);
+  if (!order || getRecordType(order) !== "order") {
+    return { ok: false, error: "발주서를 찾을 수 없습니다." };
+  }
+  const trimmed = String(clientName || "").trim();
+  if (!trimmed) return { ok: false, error: "업체명을 입력해주세요." };
+  order.clientName = trimmed;
+  order.salesClientName = trimmed;
+  saveData(data);
+  return { ok: true };
 }
 
 function buildSalesSummary(data, yearMonth) {
   const proposals = filterProposalsByMonth(getOrders(data), yearMonth);
   const clientMap = {};
+  const channelList = getChannels(data);
+  const channelIds = new Set(channelList.map((c) => c.id));
 
   proposals.forEach((p) => {
-    const ch = getChannels(data).find((c) => c.id === p.channelId);
-    const key = getSalesClientKey(p);
+    const ch = channelList.find((c) => c.id === p.channelId);
+    const key = getSalesClientKey(p, ch);
     if (!clientMap[key]) {
       clientMap[key] = {
         channelId: p.channelId,
         channelName: ch?.name || p.channelId,
         clientId: p.clientId || null,
-        clientName: getSalesClientLabel(p),
+        clientName: getSalesClientLabel(p, ch),
         count: 0,
         totalKrw: 0,
         totalUsd: 0,
@@ -451,7 +484,7 @@ function buildSalesSummary(data, yearMonth) {
     return getProposalCurrency(p, ch) === "JPY" ? sum + (p.totalAmount || 0) : sum;
   }, 0);
 
-  const byChannel = getChannels(data).map((ch) => {
+  const byChannel = channelList.map((ch) => {
     const channelProposals = proposals.filter((p) => p.channelId === ch.id);
     const totals = { krw: 0, usd: 0, jpy: 0 };
     channelProposals.forEach((p) => {
@@ -469,9 +502,32 @@ function buildSalesSummary(data, yearMonth) {
       totalUsd: totals.usd,
       totalJpy: totals.jpy,
       proposals: channelProposals,
-      clients: [...new Set(channelProposals.map((p) => getSalesClientKey(p)))],
+      clients: [...new Set(channelProposals.map((p) => getSalesClientKey(p, ch)))],
     };
   });
+
+  const orphanProposals = proposals.filter((p) => !channelIds.has(p.channelId));
+  if (orphanProposals.length) {
+    const totals = { krw: 0, usd: 0, jpy: 0 };
+    orphanProposals.forEach((p) => {
+      const currency = getProposalCurrency(p, null);
+      if (currency === "KRW") totals.krw += p.totalAmount || 0;
+      else if (currency === "JPY") totals.jpy += p.totalAmount || 0;
+      else totals.usd += p.totalAmount || 0;
+    });
+    byChannel.push({
+      channelId: "__orphan__",
+      channelName: "이전 국가(삭제·변경됨)",
+      currency: "KRW",
+      count: orphanProposals.length,
+      totalKrw: totals.krw,
+      totalUsd: totals.usd,
+      totalJpy: totals.jpy,
+      proposals: orphanProposals,
+      clients: [...new Set(orphanProposals.map((p) => getSalesClientKey(p, null)))],
+      isOrphan: true,
+    });
+  }
 
   return {
     yearMonth,

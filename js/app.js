@@ -248,6 +248,7 @@ function renderSalesChannelDetail(channelId, summary, monthLabel) {
       <div class="card-title">${ch.channelName} 발주 상세 — ${monthLabel} (${ch.count}건)</div>
       <div class="card-desc">
         국가 합계 ${formatDualCurrencyTotals(ch.totalKrw, ch.totalUsd, " · ", ch.totalJpy)} · 업체 ${channelClients.length}곳
+        ${ch.isOrphan ? `<br><span class="field-hint">예전에 등록한 판매국가 코드의 발주입니다. 업체명을 수정해 현재 국가·업체에 맞게 정리할 수 있습니다.</span>` : ""}
       </div>
       ${channelClients
         .map((client) => {
@@ -258,7 +259,7 @@ function renderSalesChannelDetail(channelId, summary, monthLabel) {
         <div class="sales-client-block">
           <div class="sales-client-header">
             <div>
-              <strong>${client.clientName}</strong>
+              <strong>${escapeAttr(client.clientName)}</strong>
               <span class="sales-client-count">${client.count}건</span>
             </div>
             <div class="sales-client-totals">${formatDualCurrencyTotalsHtml(client.totalKrw, client.totalUsd, client.totalJpy)}</div>
@@ -271,13 +272,16 @@ function renderSalesChannelDetail(channelId, summary, monthLabel) {
                 <span class="badge badge-default">발주</span>
                 <span class="version">v${p.version}</span>
                 <span class="date">${p.poDate}</span>
-                ${p.poNumber ? `<span>발주번호 ${p.poNumber}</span>` : ""}
+                ${p.poNumber ? `<span>발주번호 ${escapeAttr(p.poNumber)}</span>` : ""}
                 <span class="date">${formatProposalMoney(p.totalAmount, p, ch)}</span>
+              </div>
+              <div class="sales-order-client-edit no-print">
+                <label>업체명</label>
+                <input type="text" class="input-cell sales-client-edit-input" data-order-id="${p.id}" value="${escapeAttr(getSalesClientLabel(p, ch))}" list="sales-client-suggestions-${channelId}">
+                <button type="button" class="btn btn-secondary btn-sm" data-save-order-client="${p.id}">업체명 저장</button>
               </div>
               <div class="history-actions no-print">
                 <button class="btn btn-secondary btn-sm" data-view-proposal="${p.id}">보기</button>
-                <button class="btn btn-secondary btn-sm" data-pdf-id="${p.id}">📄 PDF</button>
-                <button class="btn btn-primary btn-sm" data-excel-id="${p.id}">📥 엑셀</button>
                 <button class="btn btn-danger btn-sm" data-delete-proposal="${p.id}">삭제</button>
               </div>
             </div>`
@@ -286,6 +290,11 @@ function renderSalesChannelDetail(channelId, summary, monthLabel) {
         </div>`;
         })
         .join("")}
+      <datalist id="sales-client-suggestions-${channelId}">
+        ${getClients(appData, channelId === "__orphan__" ? "" : channelId)
+          .map((c) => `<option value="${escapeAttr(c.name)}"></option>`)
+          .join("")}
+      </datalist>
     </div>
     <div id="sales-proposal-detail"></div>
   `;
@@ -296,6 +305,9 @@ function formatNumber(value, decimals = 2) {
 }
 
 function channelBadge(channelId) {
+  if (channelId === "__orphan__") {
+    return `<span class="badge badge-default">이전</span>`;
+  }
   const ch = getChannelList().find((c) => c.id === channelId);
   const badgeClass = {
     "KR-OLIVE": "badge-olive",
@@ -1674,6 +1686,7 @@ function savePoUpload() {
     channelId: selected.channelId,
     clientId: selected.clientId,
     clientName: selected.clientName,
+    salesClientName: selected.clientName,
     poDate: poUploadState.poDate,
     poNumber: poUploadState.poNumber,
     fobRate: 0,
@@ -2579,10 +2592,32 @@ function bindHistoryEvents() {
   });
 }
 
+function getOtherOrderMonths(currentMonth) {
+  const months = new Set();
+  getOrders(appData).forEach((p) => {
+    const d = getProposalDate(p);
+    if (d) months.add(d.slice(0, 7));
+  });
+  return [...months]
+    .filter((m) => m !== currentMonth)
+    .sort()
+    .reverse()
+    .map((m) => {
+      const [y, mo] = m.split("-");
+      return { value: m, label: `${y}년 ${parseInt(mo)}월` };
+    });
+}
+
 function renderSales() {
   const summary = buildSalesSummary(appData, salesMonth);
   const [year, month] = salesMonth.split("-");
   const monthLabel = `${year}년 ${parseInt(month)}월`;
+  const otherMonths = getOtherOrderMonths(salesMonth);
+  const otherMonthsHint = otherMonths.length
+    ? `<p class="field-hint" style="margin-top:8px">다른 달 발주: ${otherMonths
+        .map((m) => `<button type="button" class="link-btn" data-jump-sales-month="${m.value}">${m.label}</button>`)
+        .join(" · ")}</p>`
+    : "";
 
   const channelCards = summary.byChannel
     .map((ch) => {
@@ -2624,6 +2659,7 @@ function renderSales() {
         <div class="empty-state">
           <div class="empty-icon">📈</div>
           ${monthLabel}에 등록된 발주서가 없습니다.<br>
+          ${otherMonthsHint}
           <button class="btn btn-primary" style="margin-top:16px" onclick="setView('poupload')">발주서 등록 →</button>
         </div>
       </div>
@@ -2635,7 +2671,8 @@ function renderSales() {
       <span class="help-icon">📈</span>
       <div>
         <strong>${monthLabel}</strong> 기준 <strong>실제 발주(매출)</strong> 현황입니다.
-        위 <strong>판매국가</strong>를 클릭하면 업체별 발주 상세를 볼 수 있습니다. 원화·달러·엔화는 각각 합산됩니다.
+        위 <strong>판매국가</strong>를 클릭하면 업체별 발주 상세를 볼 수 있습니다. 업체명이 잘못되면 상세에서 수정할 수 있습니다.
+        ${otherMonthsHint}
       </div>
     </div>
 
@@ -2682,6 +2719,31 @@ function bindSalesEvents() {
     btn.addEventListener("click", () => {
       const channelId = btn.dataset.salesChannel;
       salesChannelId = salesChannelId === channelId ? "" : channelId;
+      render();
+      if (salesChannelId) {
+        document.querySelector(".sales-channel-detail")?.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-jump-sales-month]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      salesMonth = btn.dataset.jumpSalesMonth;
+      salesChannelId = "";
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-save-order-client]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const orderId = btn.dataset.saveOrderClient;
+      const input = document.querySelector(`[data-order-id="${orderId}"]`);
+      const result = updateOrderClientName(appData, orderId, input?.value || "");
+      if (!result.ok) {
+        showToast(result.error || "업체명 저장 실패");
+        return;
+      }
+      showToast("업체명이 저장되었습니다");
       render();
       if (salesChannelId) {
         document.querySelector(".sales-channel-detail")?.scrollIntoView({ behavior: "smooth" });
