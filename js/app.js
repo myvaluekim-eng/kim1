@@ -1120,25 +1120,27 @@ function updateProposalCalcs(channel) {
 
 function emptyPoRow() {
   return {
-    barcode: "",
     name: "",
-    spec: "",
-    unit: "",
-    dueDate: "",
     qty: null,
     unitPrice: null,
     amount: null,
-    amountVat: null,
-    matchedCode: null,
-    matchedName: null,
   };
+}
+
+function mapParsedPoRows(rows) {
+  return (rows || []).map((r) => ({
+    name: r.name || "",
+    qty: r.qty ?? null,
+    unitPrice: r.unitPrice ?? null,
+    amount: r.amount ?? null,
+  }));
 }
 
 function renderPoReviewSection(channel, rows) {
   const totalAmount = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
   return `
     <div class="section-block">
-      <div class="section-label">③ ${rows.length ? `인식 결과 (${rows.length}건)` : "품목 입력"}</div>
+      <div class="section-label">④ ${rows.length ? `인식 결과 (${rows.length}건)` : "품목 입력"}</div>
       <div class="table-wrap">
         <table class="po-review-table">
           <thead>
@@ -1147,18 +1149,17 @@ function renderPoReviewSection(channel, rows) {
               <th>발주수량</th>
               <th>단가</th>
               <th>금액</th>
-              <th class="no-print">제품 연결</th>
               <th class="no-print"></th>
             </tr>
           </thead>
           <tbody id="po-review-body">
-            ${rows.length ? rows.map((r, i) => renderPoRow(r, i)).join("") : `<tr><td colspan="6" class="po-empty-hint">+ 행 추가 버튼으로 품목을 입력하세요</td></tr>`}
+            ${rows.length ? rows.map((r, i) => renderPoRow(r, i)).join("") : `<tr><td colspan="5" class="po-empty-hint">+ 행 추가 버튼으로 품명·발주수량·단가·금액을 입력하세요</td></tr>`}
           </tbody>
           <tfoot>
             <tr>
               <td colspan="3" style="text-align:right;font-weight:700">합계</td>
               <td class="total-row" id="po-total-amount">${formatMoney(totalAmount, channel)}</td>
-              <td colspan="2"></td>
+              <td></td>
             </tr>
           </tfoot>
         </table>
@@ -1172,10 +1173,8 @@ function renderPoReviewSection(channel, rows) {
 }
 
 function renderPoRow(r, i) {
-  const products = getProducts(appData);
-  const matched = !!r.matchedCode;
   return `
-    <tr data-row-index="${i}" class="${matched ? "" : "po-row-unmatched"}">
+    <tr data-row-index="${i}">
       <td class="editable">
         <input class="input-cell po-name-input" type="text" data-po-field="name" data-row-index="${i}" value="${(r.name || "").replace(/"/g, "&quot;")}" placeholder="품명">
       </td>
@@ -1187,18 +1186,6 @@ function renderPoRow(r, i) {
       </td>
       <td class="editable">
         <input class="input-cell" type="number" step="1" min="0" data-po-field="amount" data-row-index="${i}" value="${r.amount ?? ""}" placeholder="0">
-      </td>
-      <td class="no-print po-match-cell">
-        <select class="input-cell" data-po-field="matchedCode" data-row-index="${i}" title="등록 제품 연결 (선택)">
-          <option value="">연결 안 함</option>
-          ${products
-            .map(
-              (p) =>
-                `<option value="${p.code}" ${p.code === r.matchedCode ? "selected" : ""}>${p.nameKor}</option>`
-            )
-            .join("")}
-        </select>
-        ${r.barcode ? `<span class="field-hint">${r.barcode}</span>` : ""}
       </td>
       <td class="no-print"><button class="btn btn-danger btn-sm" data-po-remove-row="${i}">삭제</button></td>
     </tr>
@@ -1517,29 +1504,10 @@ function handlePoFile(file) {
   render();
 
   const applyParsed = (parsed) => {
-    const products = getProducts(appData);
-    poUploadState.rows = matchPoRowsToProducts(parsed.rows, products);
+    poUploadState.rows = mapParsedPoRows(parsed.rows);
     if (parsed.poNumber) poUploadState.poNumber = parsed.poNumber;
     if (parsed.poDate) poUploadState.poDate = parsed.poDate;
-    if (parsed.isOliveYoung || (parsed.rawText && isOliveYoungPoText(parsed.rawText))) {
-      poUploadState.channelId = "KR-OLIVE";
-      if (!poUploadState.clientName) {
-        const oliveClients = getClients(appData, "KR-OLIVE");
-        const hit =
-          oliveClients.find((c) => /올리브|홍천|OY/i.test(c.name)) ||
-          oliveClients[0];
-        if (hit) poUploadState.clientName = hit.name;
-      }
-    }
     poUploadState.warning = parsed.warning || "";
-    if (parsed.isOliveYoung && poUploadState.rows.length) {
-      poUploadState.warning = [
-        poUploadState.warning,
-        "올리브영 구매발주서로 인식했습니다. 판매국가가 올리브영으로 설정됩니다.",
-      ]
-        .filter(Boolean)
-        .join(" ");
-    }
     if (!poUploadState.rows.length && (poUploadState.fileKind === "image" || poUploadState.fileKind === "pdf")) {
       poUploadState.rows = [emptyPoRow(), emptyPoRow(), emptyPoRow()];
     }
@@ -1629,44 +1597,36 @@ function savePoUpload() {
       return;
     }
   } else {
-    if (!poUploadState.rows.length) {
-      showToast("인식된 품목이 없습니다. 품명·수량·단가·금액을 확인해주세요");
+    const validRows = poUploadState.rows.filter(
+      (r) => r.name?.trim() && r.qty != null && r.qty > 0 && r.amount != null && r.amount > 0
+    );
+    if (!validRows.length) {
+      showToast("품명·발주수량·금액이 입력된 품목이 없습니다");
       return;
     }
-    const emptyRows = poUploadState.rows.filter((r) => !r.name?.trim() || (r.qty == null && r.amount == null));
-    if (emptyRows.length) {
-      showToast("품명 또는 수량·금액이 비어 있는 행이 있습니다");
-      return;
-    }
-    const unmatched = poUploadState.rows.filter((r) => !r.matchedCode);
-    if (unmatched.length) {
-      poUploadState.warning = [
-        poUploadState.warning,
-        `제품 매칭 안 됨 ${unmatched.length}건 — 품번·품명으로 저장됩니다.`,
-      ]
-        .filter(Boolean)
-        .join(" ");
-    }
-    items = poUploadState.rows.map((r) => {
-      const product = products.find((p) => p.code === r.matchedCode);
-      const qty = r.qty ?? 0;
-      const amount = r.amount ?? (r.unitPrice != null ? r.unitPrice * qty : 0);
+    items = validRows.map((r, idx) => {
+      const qty = r.qty;
+      const unitPrice = r.unitPrice;
+      const amount = r.amount ?? (unitPrice != null ? unitPrice * qty : 0);
+      const currency = channel.currency;
       return {
-        productCode: r.matchedCode || `PO-${r.barcode || r.name?.slice(0, 10) || Date.now()}`,
-        nameKor: product?.nameKor || r.name || r.barcode,
-        srpKrw: channel.currency === "KRW" ? r.unitPrice : null,
-        srpUsd: channel.currency === "USD" ? r.unitPrice : null,
+        productCode: `PO-${Date.now()}-${idx}`,
+        nameKor: r.name.trim(),
+        srpKrw: currency === "KRW" ? unitPrice : null,
+        srpUsd: currency === "USD" ? unitPrice : null,
+        srpJpy: currency === "JPY" ? unitPrice : null,
         fobRate: 0,
         fobUsd: null,
         fobKrw: null,
         poQty: qty,
         amount,
-        poBarcode: r.barcode,
       };
     });
   }
 
-  const totalAmount = items.reduce((s, i) => s + i.amount, 0);
+  const totalAmount = items.reduce((s, i) => s + (i.amount || 0), 0);
+  const savedMonth = (poUploadState.poDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
+  const savedChannelId = poUploadState.channelId;
   const version = saveProposal(appData, {
     channelId: poUploadState.channelId,
     clientName: poUploadState.clientName,
@@ -1685,6 +1645,8 @@ function savePoUpload() {
 
   showToast(`발주서가 저장되었습니다 — v${version} (영업 현황 반영)`);
   poUploadState = freshPoUploadState();
+  salesMonth = savedMonth;
+  salesChannelId = savedChannelId;
   setView("sales");
 }
 
@@ -1795,13 +1757,6 @@ function bindPoUploadEvents() {
       const field = e.target.dataset.poField;
       const row = poUploadState.rows[idx];
       if (!row) return;
-      if (field === "matchedCode") {
-        row.matchedCode = e.target.value || null;
-        const product = getProducts(appData).find((p) => p.code === row.matchedCode);
-        row.matchedName = product ? product.nameKor : null;
-        render();
-        return;
-      }
       if (field === "qty" || field === "unitPrice" || field === "amount") {
         row[field] = parseOptionalNumber(e.target.value);
         updatePoTotals();

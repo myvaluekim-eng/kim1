@@ -249,21 +249,18 @@ function poIsTitleNoise(name) {
 function poIsValidProductRow(row) {
   if (!row || poIsTitleNoise(row.name)) return false;
 
-  const hasBarle = /바를/.test(row.name || "");
-  const hasBarcode = /^8800\d{9,}$/.test(String(row.barcode || ""));
-  if (!hasBarle && !hasBarcode) return false;
-
+  const name = String(row.name || "").trim();
   const qty = row.qty;
   const unitPrice = row.unitPrice;
   const amount = row.amount;
+  if (!name || name.length < 2) return false;
   if (qty == null || amount == null) return false;
   if (qty < 1 || qty > 500000) return false;
-  if (amount < 1000) return false;
+  if (amount < 1) return false;
 
-  if (unitPrice != null) {
-    if (unitPrice < 500 || unitPrice > 200000) return false;
+  if (unitPrice != null && unitPrice > 0) {
     const expected = qty * unitPrice;
-    if (expected > 0 && Math.abs(expected - amount) / expected > 0.12) return false;
+    if (expected > 0 && Math.abs(expected - amount) / expected > 0.15) return false;
   }
 
   return true;
