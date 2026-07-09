@@ -876,6 +876,117 @@ function parsePoFromPlainText(text) {
   };
 }
 
+function ensurePdfJsWorker() {
+  if (typeof pdfjsLib === "undefined") return;
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+}
+
+function pdfTextContentToLines(textContent) {
+  if (!textContent?.items?.length) return "";
+  const items = textContent.items
+    .filter((item) => item.str?.trim())
+    .map((item) => ({
+      str: item.str.trim(),
+      y: item.transform[5],
+      x: item.transform[4],
+    }));
+  items.sort((a, b) => b.y - a.y || a.x - b.x);
+
+  let text = "";
+  let lastY = null;
+  for (const item of items) {
+    if (lastY !== null && Math.abs(item.y - lastY) > 3) text += "\n";
+    else if (text && !text.endsWith("\n")) text += " ";
+    text += item.str;
+    lastY = item.y;
+  }
+  return text;
+}
+
+async function pdfPageToImageFile(page, pageNum) {
+  const viewport = page.getViewport({ scale: 2 });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  return new File([blob || new Blob()], `po-page-${pageNum}.png`, { type: "image/png" });
+}
+
+function mergePoPdfPages(pages, fullText) {
+  const allRows = [];
+  let poNumber = null;
+  let poDate = null;
+  let isOliveYoung = false;
+
+  for (const p of pages) {
+    if (p?.rows?.length) allRows.push(...p.rows);
+    poNumber ||= p?.poNumber;
+    poDate ||= p?.poDate;
+    isOliveYoung ||= p?.isOliveYoung;
+  }
+
+  const rows = poFilterValidRows(allRows);
+  return poFinalizeParseResult(
+    {
+      poNumber: poNumber || poExtractPoNumber(fullText),
+      poDate: poDate || poExtractPoDate(fullText),
+      rows,
+      isOliveYoung: isOliveYoung || isOliveYoungPoText(fullText),
+      warning: rows.length
+        ? "PDF 스캔 이미지(OCR)로 인식했습니다. 저장 전 확인해주세요."
+        : "PDF에서 품목을 찾지 못했습니다. 아래 표에 직접 입력해주세요.",
+    },
+    fullText
+  );
+}
+
+function parsePoPdfFile(file, onProgress) {
+  return (async () => {
+    if (typeof pdfjsLib === "undefined") {
+      throw new Error("PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.");
+    }
+    ensurePdfJsWorker();
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const numPages = pdf.numPages;
+
+    let fullText = "";
+    for (let i = 1; i <= numPages; i++) {
+      onProgress?.({ status: "pdf-text", progress: (i / numPages) * 0.35 });
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      fullText += pdfTextContentToLines(textContent) + "\n\n";
+    }
+
+    let parsed = poFinalizeParseResult(parsePoFromPlainText(fullText), fullText);
+    if (parsed.rows.length >= 1) {
+      parsed.warning =
+        parsed.warning ||
+        "PDF 텍스트에서 품목을 인식했습니다. 저장 전 확인해주세요.";
+      return parsed;
+    }
+
+    const ocrResults = [];
+    for (let i = 1; i <= numPages; i++) {
+      onProgress?.({ status: "pdf-ocr", progress: 0.35 + (i / numPages) * 0.65 });
+      const page = await pdf.getPage(i);
+      const imgFile = await pdfPageToImageFile(page, i);
+      const pageParsed = await parsePoImageFile(imgFile, onProgress);
+      ocrResults.push(pageParsed);
+    }
+
+    return mergePoPdfPages(ocrResults, fullText);
+  })();
+}
+
 function parsePoImageFile(file, onProgress) {
   return (async () => {
     if (typeof Tesseract === "undefined") {

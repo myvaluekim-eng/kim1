@@ -1433,7 +1433,7 @@ function renderPoUpload() {
       <span class="help-icon">🧾</span>
       <div>
         <strong>발주서 = 매출</strong> · 실제 발주가 들어온 건을 등록합니다. 저장하면 <strong>영업 현황에 반영</strong>됩니다.<br>
-        파일 업로드(OCR/엑셀) 또는 제품별 수기 입력 중 선택하세요.
+        파일 업로드(PDF/엑셀/이미지) 또는 제품별 수기 입력 중 선택하세요.
       </div>
     </div>
 
@@ -1484,10 +1484,10 @@ function renderPoUpload() {
     <div class="section-block no-print">
       <div class="section-label">③ 발주서 파일 업로드</div>
       <div class="po-dropzone" id="po-dropzone">
-        <input type="file" id="po-file-input" accept=".xlsx,.xls,.csv,image/*,.png,.jpg,.jpeg" hidden>
+        <input type="file" id="po-file-input" accept=".xlsx,.xls,.csv,.pdf,image/*,.png,.jpg,.jpeg" hidden>
         <div class="po-dropzone-icon">📎</div>
         <p><strong>클릭하거나 파일을 끌어다 놓으세요</strong></p>
-        <p class="po-dropzone-sub">엑셀(.xlsx, .xls, .csv) 또는 이미지(사진, 스캔본)</p>
+        <p class="po-dropzone-sub">PDF · 엑셀(.xlsx, .xls, .csv) · 이미지(사진, 스캔본)</p>
         ${poUploadState.fileName ? `<p class="po-dropzone-file">📄 ${poUploadState.fileName}</p>` : ""}
       </div>
       ${
@@ -1511,8 +1511,9 @@ function handlePoFile(file) {
   poUploadState.status = "parsing";
   poUploadState.statusMsg = "";
   poUploadState.warning = "";
-  const isImage = file.type.startsWith("image/");
-  poUploadState.fileKind = isImage ? "image" : "excel";
+  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(file.name);
+  poUploadState.fileKind = isPdf ? "pdf" : isImage ? "image" : "excel";
   render();
 
   const applyParsed = (parsed) => {
@@ -1539,7 +1540,7 @@ function handlePoFile(file) {
         .filter(Boolean)
         .join(" ");
     }
-    if (!poUploadState.rows.length && poUploadState.fileKind === "image") {
+    if (!poUploadState.rows.length && (poUploadState.fileKind === "image" || poUploadState.fileKind === "pdf")) {
       poUploadState.rows = [emptyPoRow(), emptyPoRow(), emptyPoRow()];
     }
     poUploadState.status = "done";
@@ -1553,16 +1554,22 @@ function handlePoFile(file) {
     render();
   };
 
-  if (isImage) {
-    parsePoImageFile(file, (m) => {
-      if (m.status && m.progress != null) {
-        poUploadState.statusMsg = `OCR 인식 중... (${m.status} ${Math.round(m.progress * 100)}%)`;
-        const statusEl = document.querySelector(".po-status-parsing");
-        if (statusEl) statusEl.textContent = poUploadState.statusMsg;
-      }
-    })
-      .then(applyParsed)
-      .catch(onFail);
+  const updateParsingStatus = (m) => {
+    if (!m?.status || m.progress == null) return;
+    const labels = {
+      "pdf-text": "PDF 텍스트 추출",
+      "pdf-ocr": "PDF OCR 인식",
+    };
+    const label = labels[m.status] || (m.status === "recognizing text" ? "OCR 인식" : m.status);
+    poUploadState.statusMsg = `${label}... (${Math.round(m.progress * 100)}%)`;
+    const statusEl = document.querySelector(".po-status-parsing");
+    if (statusEl) statusEl.textContent = poUploadState.statusMsg;
+  };
+
+  if (isPdf) {
+    parsePoPdfFile(file, updateParsingStatus).then(applyParsed).catch(onFail);
+  } else if (isImage) {
+    parsePoImageFile(file, updateParsingStatus).then(applyParsed).catch(onFail);
   } else {
     parsePoExcelFile(file).then(applyParsed).catch(onFail);
   }
