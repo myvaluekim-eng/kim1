@@ -1,8 +1,8 @@
 const PO_CORE_HEADERS = [
-  { key: "name", test: /품명|제품명/ },
-  { key: "qty", test: /발주\s*수량|^수량$/ },
-  { key: "unitPrice", test: /단가/ },
-  { key: "amount", test: /^금액$/ },
+  { key: "name", test: /품명|제품명|품목|^description$|^item(name)?$/i },
+  { key: "qty", test: /발주\s*수량|^수량$|^qty$|^quantity$/i },
+  { key: "unitPrice", test: /단가|^unit\s*price$|^price$/i },
+  { key: "amount", test: /^금액$|^amount$|^total\s*amount$|^total$/i },
 ];
 
 const PO_EXTRA_HEADERS = [
@@ -64,12 +64,18 @@ function isOliveYoungPoText(text) {
 
 function poIsSubtotalRow(text) {
   const c = poCompact(text);
-  return /^소계/.test(c) || c === "소계" || /^금액합계/.test(c);
+  return /^소계/.test(c) || c === "소계" || /^금액합계/.test(c) || /^total$/i.test(c);
 }
 
 function poIsHeaderLikeRow(text) {
   const c = poCompact(text);
-  return /품명.*발주수량|발주수량.*단가|품번.*품명|^no\.?품번/i.test(c);
+  if (!c) return false;
+  if (/^no\.?품번/i.test(c)) return true;
+  const hasName = /품명|제품명|품목|description|item/i.test(c);
+  const hasQty = /발주수량|수량|qty|quantity/i.test(c);
+  const hasPrice = /단가|unitprice|price/i.test(c);
+  const hasAmount = /금액|amount|total/i.test(c);
+  return [hasName, hasQty, hasPrice, hasAmount].filter(Boolean).length >= 3;
 }
 
 function poCoreHeaderScore(found) {
@@ -110,7 +116,7 @@ function poExtractNumbersFromTail(text, excludeText) {
     numsPart = work.slice(work.indexOf(dueDateMatch[0]) + dueDateMatch[0].length);
   }
   const nums = poFilterQtyNumbers(
-    [...numsPart.matchAll(/(\d{1,3}(?:,\d{3})+|\d+)/g)]
+    [...numsPart.matchAll(/(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/g)]
       .map((m) => poNormalizeNumber(m[0]))
       .filter((n) => n != null)
   );
@@ -118,8 +124,11 @@ function poExtractNumbersFromTail(text, excludeText) {
 }
 
 function parsePoCoreLine(lineText) {
-  const line = poNormalizeOcrText(String(lineText || "").trim());
+  let line = poNormalizeOcrText(String(lineText || "").trim());
   if (!line || poIsSubtotalRow(line) || poIsHeaderLikeRow(line)) return null;
+
+  // 앞에 "1", "2." 같은 No.(순번) 열이 붙어 있으면 수량/단가로 잘못 섞여 들어가므로 미리 떼어낸다.
+  line = line.replace(/^(\d{1,3})[\s.):]+(?=(8800\d{9}|\d{10,13}|[A-Za-z가-힣]))/, "");
 
   const specMatch = line.match(/(\d+\s*EA\s*\/?\s*\d+)/i);
   const barcodeMatch = line.match(/(8800\d{9,12})/);
@@ -148,7 +157,13 @@ function parsePoCoreLine(lineText) {
     name = line.slice(line.indexOf(barcodeMatch[0]) + barcodeMatch[0].length);
   } else {
     const korean = line.match(/(바를[가-힣0-9a-zA-Z\s()\-+.*%mlg\/]+|[가-힣][가-힣0-9a-zA-Z\s()\-+.*%mlg\/]{3,})/);
-    name = korean ? korean[1] : "";
+    if (korean) {
+      name = korean[1];
+    } else {
+      // 품명이 영문(수출용 발주서 등)인 경우: 수량 숫자가 시작되기 전까지의 영문 구간을 품명으로 본다.
+      const english = line.match(/^([A-Za-z][A-Za-z0-9\s()\-+.,\/%]{2,}?)(?=\s*[₩$€]?\s*[\d,]{1,})/);
+      name = english ? english[1] : "";
+    }
   }
 
   if (specMatch) {
@@ -377,6 +392,25 @@ function poNormalizeNameForMatch(name) {
     .toLowerCase();
 }
 
+function poTokenize(name) {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .split(/[^a-z0-9가-힣]+/i)
+    .filter((t) => t.length >= 3);
+}
+
+function poTokenOverlapScore(a, b) {
+  const setA = new Set(poTokenize(a));
+  const setB = new Set(poTokenize(b));
+  if (!setA.size || !setB.size) return 0;
+  let shared = 0;
+  setA.forEach((t) => {
+    if (setB.has(t)) shared++;
+  });
+  return shared / Math.min(setA.size, setB.size);
+}
+
 function matchPoProduct(products, { barcode, name }) {
   if (barcode) {
     const digits = String(barcode).replace(/\D/g, "");
@@ -385,19 +419,42 @@ function matchPoProduct(products, { barcode, name }) {
       if (exact) return exact.code;
     }
   }
-  if (name) {
-    const n = poNormalizeNameForMatch(name);
-    if (n.length >= 4) {
-      const hit = products.find((p) => {
-        const pn = poNormalizeNameForMatch(p.nameKor);
-        if (!pn || pn.length < 4) return false;
-        const core = n.slice(0, Math.min(8, n.length));
-        const pCore = pn.slice(0, Math.min(8, pn.length));
-        return pn.includes(core) || n.includes(pCore) || pn.includes(n) || n.includes(pn);
-      });
-      if (hit) return hit.code;
-    }
+  if (!name) return null;
+
+  const n = poNormalizeNameForMatch(name);
+  if (n.length >= 4) {
+    // 한글 제품명 매칭
+    const korHit = products.find((p) => {
+      const pn = poNormalizeNameForMatch(p.nameKor);
+      if (!pn || pn.length < 4) return false;
+      const core = n.slice(0, Math.min(8, n.length));
+      const pCore = pn.slice(0, Math.min(8, pn.length));
+      return pn.includes(core) || n.includes(pCore) || pn.includes(n) || n.includes(pn);
+    });
+    if (korHit) return korHit.code;
+
+    // 영문 제품명(nameEng) 매칭 — 해외 발주서·수출용 PO는 영문 품명만 있는 경우가 많음
+    const engHit = products.find((p) => {
+      const pn = poNormalizeNameForMatch(p.nameEng);
+      if (!pn || pn.length < 4) return false;
+      return pn.includes(n) || n.includes(pn);
+    });
+    if (engHit) return engHit.code;
   }
+
+  // 표기가 달라 정확히 안 맞을 때(예: "Glow plumping Lip Balm Pink" vs
+  // "Barle Glowy Plumping Balm Melting Pink") 핵심 단어 겹침으로 한 번 더 시도
+  let best = null;
+  let bestScore = 0;
+  products.forEach((p) => {
+    const score = Math.max(poTokenOverlapScore(name, p.nameKor), poTokenOverlapScore(name, p.nameEng));
+    if (score > bestScore) {
+      bestScore = score;
+      best = p;
+    }
+  });
+  if (best && bestScore >= 0.6) return best.code;
+
   return null;
 }
 
