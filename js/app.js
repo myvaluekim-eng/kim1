@@ -2711,7 +2711,10 @@ function setupAppNavigation() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function bootApp() {
+  const versionEl = document.getElementById("app-version-label");
+  if (versionEl) versionEl.textContent = "버전 " + window.APP_BUILD;
+
   initProposalState("CN");
   setupGlobalDeleteHandlers();
   setupClientModal();
@@ -2731,7 +2734,13 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("sidebar").classList.remove("open");
     document.getElementById("sidebar-overlay").classList.remove("open");
   });
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootApp);
+} else {
+  bootApp();
+}
 
 window.setView = setView;
 window.goBack = goBack;
