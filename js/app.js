@@ -1188,16 +1188,25 @@ function emptyPoRow() {
     qty: null,
     unitPrice: null,
     amount: null,
+    matchedCode: null,
+    matchedName: null,
   };
 }
 
 function mapParsedPoRows(rows) {
-  return (rows || []).map((r) => ({
-    name: r.name || "",
-    qty: r.qty ?? null,
-    unitPrice: r.unitPrice ?? null,
-    amount: r.amount ?? null,
-  }));
+  const products = getProducts(appData);
+  return (rows || []).map((r) => {
+    const matchedCode = matchPoProduct(products, { barcode: r.barcode, name: r.name });
+    const product = products.find((p) => p.code === matchedCode);
+    return {
+      name: r.name || "",
+      qty: r.qty ?? null,
+      unitPrice: r.unitPrice ?? null,
+      amount: r.amount ?? null,
+      matchedCode: matchedCode || null,
+      matchedName: product ? product.nameKor : null,
+    };
+  });
 }
 
 function renderPoReviewSection(channel, rows) {
@@ -1214,7 +1223,8 @@ function renderPoReviewSection(channel, rows) {
         <table class="po-review-table">
           <thead>
             <tr>
-              <th>품명</th>
+              <th>품명(원문)</th>
+              <th>등록 제품 매칭</th>
               <th>발주수량</th>
               <th>단가</th>
               <th>금액</th>
@@ -1222,11 +1232,11 @@ function renderPoReviewSection(channel, rows) {
             </tr>
           </thead>
           <tbody id="po-review-body">
-            ${rows.length ? rows.map((r, i) => renderPoRow(r, i)).join("") : `<tr><td colspan="5" class="po-empty-hint">+ 행 추가 버튼으로 품명·발주수량·단가·금액을 입력하세요</td></tr>`}
+            ${rows.length ? rows.map((r, i) => renderPoRow(r, i)).join("") : `<tr><td colspan="6" class="po-empty-hint">+ 행 추가 버튼으로 품명·발주수량·단가·금액을 입력하세요</td></tr>`}
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="3" style="text-align:right;font-weight:700">합계</td>
+              <td colspan="4" style="text-align:right;font-weight:700">합계</td>
               <td class="total-row" id="po-total-amount">${formatMoney(totalAmount, channel)}</td>
               <td></td>
             </tr>
@@ -1242,10 +1252,24 @@ function renderPoReviewSection(channel, rows) {
 }
 
 function renderPoRow(r, i) {
+  const products = getProducts(appData);
+  const matched = !!r.matchedCode;
   return `
-    <tr data-row-index="${i}">
+    <tr data-row-index="${i}" class="${matched ? "" : "po-row-unmatched"}">
       <td class="editable">
-        <input class="input-cell po-name-input" type="text" data-po-field="name" data-row-index="${i}" value="${(r.name || "").replace(/"/g, "&quot;")}" placeholder="품명">
+        <input class="input-cell po-name-input" type="text" data-po-field="name" data-row-index="${i}" value="${(r.name || "").replace(/"/g, "&quot;")}" placeholder="품명(영문도 가능)">
+      </td>
+      <td class="editable">
+        <select class="input-cell" data-po-field="matchedCode" data-row-index="${i}">
+          <option value="">${matched ? "매칭 안됨으로 변경" : "-- 등록 제품 선택 --"}</option>
+          ${products
+            .map(
+              (p) =>
+                `<option value="${escapeAttr(p.code)}" ${p.code === r.matchedCode ? "selected" : ""}>${escapeAttr(p.nameKor)}</option>`
+            )
+            .join("")}
+        </select>
+        ${!matched ? `<span class="field-hint po-hint-warn">등록된 제품과 자동으로 매칭되지 않았습니다. 직접 선택해주세요.</span>` : ""}
       </td>
       <td class="editable">
         <input class="input-cell" type="number" step="1" min="0" data-po-field="qty" data-row-index="${i}" value="${r.qty ?? ""}" placeholder="0">
@@ -1705,9 +1729,11 @@ async function savePoUpload() {
       const unitPrice = r.unitPrice;
       const amount = r.amount ?? (unitPrice != null ? unitPrice * qty : 0);
       const currency = channel.currency;
+      const matchedProduct = r.matchedCode ? products.find((p) => p.code === r.matchedCode) : null;
       return {
-        productCode: `PO-${Date.now()}-${idx}`,
-        nameKor: r.name.trim(),
+        productCode: matchedProduct ? matchedProduct.code : `PO-${Date.now()}-${idx}`,
+        nameKor: matchedProduct ? matchedProduct.nameKor : r.name.trim(),
+        sourceName: r.name.trim(),
         srpKrw: currency === "KRW" ? unitPrice : null,
         srpUsd: currency === "USD" ? unitPrice : null,
         srpJpy: currency === "JPY" ? unitPrice : null,
@@ -1894,6 +1920,13 @@ function bindPoUploadEvents() {
       if (field === "qty" || field === "unitPrice" || field === "amount") {
         row[field] = parseOptionalNumber(e.target.value);
         updatePoTotals();
+        return;
+      }
+      if (field === "matchedCode") {
+        row.matchedCode = e.target.value || null;
+        const product = getProducts(appData).find((p) => p.code === row.matchedCode);
+        row.matchedName = product ? product.nameKor : null;
+        render();
         return;
       }
       row[field] = e.target.value;
