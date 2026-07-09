@@ -1590,8 +1590,10 @@ function handlePoFile(file) {
     poUploadState.rows = mapParsedPoRows(parsed.rows);
     if (parsed.poNumber) poUploadState.poNumber = parsed.poNumber;
     if (parsed.poDate) poUploadState.poDate = parsed.poDate;
-    if (parsed.isOliveYoung && !poUploadState.buyerName?.trim()) {
-      poUploadState.buyerName = "올리브영";
+    if (parsed.isOliveYoung) {
+      const oliveChannel = getChannelList().find((c) => c.id === "KR-OLIVE" || c.name === "올리브영");
+      if (oliveChannel) poUploadState.channelId = oliveChannel.id;
+      if (!poUploadState.buyerName?.trim()) poUploadState.buyerName = "올리브영";
     }
     poUploadState.warning = parsed.warning || "";
     if (!poUploadState.rows.length && (poUploadState.fileKind === "image" || poUploadState.fileKind === "pdf")) {
