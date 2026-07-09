@@ -353,6 +353,27 @@ function saveProposal(data, proposal) {
   return version;
 }
 
+function saveOrder(data, order) {
+  const channelOrders = data.proposals.filter(
+    (p) => p.channelId === order.channelId && getRecordType(p) === "order"
+  );
+  const version = channelOrders.length + 1;
+  const buyerName = String(order.buyerName || order.salesClientName || order.clientName || "").trim();
+  const record = {
+    ...order,
+    recordType: "order",
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    buyerName,
+    salesClientName: buyerName,
+    clientName: buyerName,
+    version,
+    createdAt: new Date().toISOString(),
+  };
+  data.proposals.unshift(record);
+  saveData(data);
+  return { version, record };
+}
+
 function getProposals(data, channelId) {
   if (!channelId) return data.proposals;
   return data.proposals.filter((p) => p.channelId === channelId);
@@ -395,13 +416,15 @@ function orderMatchesClient(proposal, client) {
 function normalizeSalesClientName(name, channel) {
   const n = String(name || "").trim();
   if (!n) return "";
-  if (channel?.name && n === channel.name) return "";
   if (channel?.id && n === channel.id) return "";
   return n;
 }
 
 function getOrderClientName(proposal, channel) {
-  return normalizeSalesClientName(proposal.salesClientName || proposal.clientName, channel);
+  return normalizeSalesClientName(
+    proposal.salesClientName || proposal.buyerName || proposal.clientName,
+    channel
+  );
 }
 
 function getSalesClientKey(proposal, channel) {
@@ -428,6 +451,7 @@ function updateOrderClientName(data, orderId, clientName) {
   if (!trimmed) return { ok: false, error: "업체명을 입력해주세요." };
   order.clientName = trimmed;
   order.salesClientName = trimmed;
+  order.buyerName = trimmed;
   saveData(data);
   return { ok: true };
 }
