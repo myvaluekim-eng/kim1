@@ -73,6 +73,7 @@ function migrateData(data) {
     if (!p.recordType) {
       p.recordType = p.source === "po-upload" ? "order" : "quote";
     }
+    if (p.clientName) p.clientName = String(p.clientName).trim();
   });
   if (!data.clients) {
     data.clients = [];
@@ -91,6 +92,14 @@ function migrateData(data) {
       });
     });
   }
+  data.proposals.forEach((p) => {
+    if (!p.clientId && p.clientName) {
+      const match = (data.clients || []).find(
+        (c) => c.channelId === p.channelId && c.name === p.clientName
+      );
+      if (match) p.clientId = match.id;
+    }
+  });
   return data;
 }
 
@@ -384,18 +393,42 @@ function getProposalCurrency(proposal, channel) {
   return channel?.currency || "USD";
 }
 
+function orderMatchesClient(proposal, client) {
+  if (!proposal || !client) return false;
+  if (proposal.channelId !== client.channelId) return false;
+  if (proposal.clientId && client.id) return proposal.clientId === client.id;
+  return proposal.clientName === client.name;
+}
+
+function getSalesClientKey(proposal) {
+  if (proposal.clientId) return `${proposal.channelId}::id:${proposal.clientId}`;
+  const name = String(proposal.clientName || "").trim();
+  return `${proposal.channelId}::name:${name}`;
+}
+
+function getSalesClientLabel(proposal, data) {
+  const snapshot = String(proposal.clientName || "").trim();
+  if (snapshot) return snapshot;
+  if (proposal.clientId) {
+    const client = (data.clients || []).find((c) => c.id === proposal.clientId);
+    if (client?.name) return client.name;
+  }
+  return "미지정";
+}
+
 function buildSalesSummary(data, yearMonth) {
   const proposals = filterProposalsByMonth(getOrders(data), yearMonth);
   const clientMap = {};
 
   proposals.forEach((p) => {
     const ch = getChannels(data).find((c) => c.id === p.channelId);
-    const key = `${p.channelId}::${p.clientName}`;
+    const key = getSalesClientKey(p);
     if (!clientMap[key]) {
       clientMap[key] = {
         channelId: p.channelId,
         channelName: ch?.name || p.channelId,
-        clientName: p.clientName,
+        clientId: p.clientId || null,
+        clientName: getSalesClientLabel(p, data),
         count: 0,
         totalKrw: 0,
         totalUsd: 0,
@@ -451,7 +484,7 @@ function buildSalesSummary(data, yearMonth) {
       totalUsd: totals.usd,
       totalJpy: totals.jpy,
       proposals: channelProposals,
-      clients: [...new Set(channelProposals.map((p) => p.clientName))],
+      clients: [...new Set(channelProposals.map((p) => getSalesClientKey(p)))],
     };
   });
 
@@ -511,18 +544,6 @@ function updateClient(data, clientId, updates) {
   );
   if (duplicate) return { ok: false, error: "같은 판매국가에 이미 등록된 업체입니다." };
 
-  const oldName = client.name;
-  const oldChannelId = client.channelId;
-
-  if (name !== oldName || channelId !== oldChannelId) {
-    data.proposals.forEach((p) => {
-      if (p.channelId === oldChannelId && p.clientName === oldName) {
-        p.channelId = channelId;
-        p.clientName = name;
-      }
-    });
-  }
-
   client.name = name;
   client.channelId = channelId;
   client.contact = updates.contact?.trim() || "";
@@ -535,9 +556,7 @@ function deleteClient(data, clientId) {
   const client = (data.clients || []).find((c) => c.id === clientId);
   if (!client) return { ok: false, error: "업체를 찾을 수 없습니다." };
 
-  const proposalCount = data.proposals.filter(
-    (p) => p.channelId === client.channelId && p.clientName === client.name
-  ).length;
+  const proposalCount = data.proposals.filter((p) => orderMatchesClient(p, client)).length;
 
   data.clients = data.clients.filter((c) => c.id !== clientId);
   saveData(data);
@@ -569,13 +588,9 @@ function clearChannelTerms(data, channelId) {
 }
 
 function getClientProposalCount(data, client) {
-  return getQuotes(data).filter(
-    (p) => p.channelId === client.channelId && p.clientName === client.name
-  ).length;
+  return getQuotes(data).filter((p) => orderMatchesClient(p, client)).length;
 }
 
 function getClientOrderCount(data, client) {
-  return getOrders(data).filter(
-    (p) => p.channelId === client.channelId && p.clientName === client.name
-  ).length;
+  return getOrders(data).filter((p) => orderMatchesClient(p, client)).length;
 }

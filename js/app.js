@@ -23,16 +23,12 @@ function ensureStoreCompat() {
   }
   if (typeof getClientProposalCount !== "function") {
     window.getClientProposalCount = function (data, client) {
-      return getQuotes(data).filter(
-        (p) => p.channelId === client.channelId && p.clientName === client.name
-      ).length;
+      return getQuotes(data).filter((p) => orderMatchesClient(p, client)).length;
     };
   }
   if (typeof getClientOrderCount !== "function") {
     window.getClientOrderCount = function (data, client) {
-      return getOrders(data).filter(
-        (p) => p.channelId === client.channelId && p.clientName === client.name
-      ).length;
+      return getOrders(data).filter((p) => orderMatchesClient(p, client)).length;
     };
   }
   if (typeof updateChannel !== "function") {
@@ -92,6 +88,7 @@ let masterNewChannel = false;
 let masterEditClientId = null;
 let proposalState = {
   channelId: "CN",
+  clientId: "",
   clientName: "",
   poDate: new Date().toISOString().slice(0, 10),
   fobRate: 29,
@@ -104,6 +101,7 @@ let productEditCode = null;
 function freshPoUploadState() {
   return {
     channelId: "CN",
+    clientId: "",
     clientName: "",
     poDate: new Date().toISOString().slice(0, 10),
     poNumber: "",
@@ -592,12 +590,13 @@ function renderChannelOptions(selectedId) {
     .join("");
 }
 
-function refreshProposalClientSelect(clientName) {
+function refreshProposalClientSelect(clientId, clientName) {
   const clientSelect = document.getElementById("client-select");
   if (!clientSelect) return;
-  clientSelect.innerHTML = getClientSelectOptions(proposalState.channelId, clientName);
+  clientSelect.innerHTML = getClientSelectOptions(proposalState.channelId, clientId, clientName);
+  proposalState.clientId = clientId || "";
   proposalState.clientName = clientName || "";
-  if (clientName) clientSelect.value = clientName;
+  if (clientId) clientSelect.value = clientId;
 }
 
 function openAddClientModal(prefillChannelId, onRegistered, prefillName) {
@@ -650,8 +649,9 @@ function setupClientModal() {
     showToast(`"${name}" 업체가 등록되었습니다`);
     const callback = quickClientCallback;
     closeAddClientModal();
+    const added = getClients(appData, channelId).find((c) => c.name === name);
     if (callback) {
-      callback({ name, channelId });
+      callback({ name, channelId, clientId: added?.id || "" });
     } else if (currentView === "master") {
       render();
     }
@@ -751,24 +751,46 @@ function renderDashboard() {
   `;
 }
 
-function getClientSelectOptions(channelId, selectedName) {
+function getClientSelectOptions(channelId, selectedClientId, selectedName) {
   const clients = getClients(appData, channelId);
   const options = clients
     .map(
       (c) =>
-        `<option value="${c.name}" ${c.name === selectedName ? "selected" : ""}>${c.name}</option>`
+        `<option value="${escapeAttr(c.id)}" ${c.id === selectedClientId ? "selected" : ""}>${escapeAttr(c.name)}</option>`
     )
     .join("");
-  const isRegistered = selectedName && clients.some((c) => c.name === selectedName);
+  const isRegistered = selectedClientId && clients.some((c) => c.id === selectedClientId);
   const legacyOption =
     selectedName && !isRegistered
-      ? `<option value="${selectedName}" selected>${selectedName}</option>`
+      ? `<option value="" data-legacy-name="${escapeAttr(selectedName)}" selected>${escapeAttr(selectedName)} (미등록)</option>`
       : "";
   return `
     <option value="">업체를 선택하세요</option>
     ${options}
     ${legacyOption}
   `;
+}
+
+function resolveClientFromSelect(channelId, selectValue, fallbackName) {
+  const clients = getClients(appData, channelId);
+  const client = clients.find((c) => c.id === selectValue);
+  if (client) {
+    return { clientId: client.id, clientName: client.name };
+  }
+  const legacyName = String(fallbackName || "").trim();
+  return { clientId: "", clientName: legacyName };
+}
+
+function buildClientSnapshot(channelId, clientId, clientName) {
+  const trimmed = String(clientName || "").trim();
+  if (clientId) {
+    const client = getClients(appData, channelId).find((c) => c.id === clientId);
+    return {
+      clientId,
+      clientName: trimmed || client?.name || "",
+    };
+  }
+  return { clientId: null, clientName: trimmed };
 }
 
 function renderProposal() {
@@ -854,7 +876,7 @@ function renderProposal() {
             <label>업체명 <span class="required">*</span></label>
             <div class="input-with-action">
               <select id="client-select">
-                ${getClientSelectOptions(proposalState.channelId, proposalState.clientName)}
+                ${getClientSelectOptions(proposalState.channelId, proposalState.clientId, proposalState.clientName)}
               </select>
               <button type="button" class="btn btn-secondary btn-compact" id="btn-quick-client">+ 신규</button>
             </div>
@@ -947,6 +969,7 @@ function bindProposalEvents() {
 
   document.getElementById("channel-select").addEventListener("change", (e) => {
     initProposalState(e.target.value);
+    proposalState.clientId = "";
     proposalState.clientName = "";
     render();
   });
@@ -955,19 +978,22 @@ function bindProposalEvents() {
 
   if (clientSelect) {
     clientSelect.addEventListener("change", (e) => {
-      proposalState.clientName = e.target.value;
+      const resolved = resolveClientFromSelect(proposalState.channelId, e.target.value, "");
+      proposalState.clientId = resolved.clientId;
+      proposalState.clientName = resolved.clientName;
     });
   }
 
   document.getElementById("btn-quick-client")?.addEventListener("click", () => {
-    openAddClientModal(proposalState.channelId, ({ name, channelId }) => {
+    openAddClientModal(proposalState.channelId, ({ name, channelId, clientId }) => {
       if (channelId !== proposalState.channelId) {
         initProposalState(channelId);
+        proposalState.clientId = clientId || "";
         proposalState.clientName = name;
         render();
         return;
       }
-      refreshProposalClientSelect(name);
+      refreshProposalClientSelect(clientId, name);
     });
   });
 
@@ -1001,14 +1027,21 @@ function bindProposalEvents() {
   });
 
   document.getElementById("btn-save").addEventListener("click", () => {
-    if (!proposalState.clientName.trim()) {
-      const select = document.getElementById("client-select");
-      if (select?.value) proposalState.clientName = select.value;
+    const select = document.getElementById("client-select");
+    if (select?.value) {
+      const resolved = resolveClientFromSelect(proposalState.channelId, select.value, proposalState.clientName);
+      proposalState.clientId = resolved.clientId;
+      proposalState.clientName = resolved.clientName;
     }
     if (!proposalState.clientName.trim()) {
       showToast("업체를 선택하거나 + 신규로 등록해주세요");
       return;
     }
+    const clientSnapshot = buildClientSnapshot(
+      proposalState.channelId,
+      proposalState.clientId,
+      proposalState.clientName
+    );
     const products = getProducts(appData);
     const terms = getChannelTerms(appData, proposalState.channelId);
     const items = products.map((p) => {
@@ -1024,7 +1057,8 @@ function bindProposalEvents() {
     const totalAmount = items.reduce((s, i) => s + i.amount, 0);
     const version = saveProposal(appData, {
       channelId: proposalState.channelId,
-      clientName: proposalState.clientName,
+      clientId: clientSnapshot.clientId,
+      clientName: clientSnapshot.clientName,
       poDate: proposalState.poDate,
       fobRate: proposalState.fobRate,
       exchangeRate: proposalState.exchangeRate,
@@ -1435,7 +1469,7 @@ function renderPoUpload() {
           <label>업체명 <span class="required">*</span></label>
           <div class="input-with-action">
             <select id="po-client-select">
-              ${getClientSelectOptions(poUploadState.channelId, poUploadState.clientName)}
+              ${getClientSelectOptions(poUploadState.channelId, poUploadState.clientId, poUploadState.clientName)}
             </select>
             <button type="button" class="btn btn-secondary" id="po-btn-quick-client">+ 신규</button>
           </div>
@@ -1551,14 +1585,21 @@ function updatePoTotals() {
 }
 
 function savePoUpload() {
-  if (!poUploadState.clientName.trim()) {
-    const select = document.getElementById("po-client-select");
-    if (select?.value) poUploadState.clientName = select.value;
+  const select = document.getElementById("po-client-select");
+  if (select?.value) {
+    const resolved = resolveClientFromSelect(poUploadState.channelId, select.value, poUploadState.clientName);
+    poUploadState.clientId = resolved.clientId;
+    poUploadState.clientName = resolved.clientName;
   }
   if (!poUploadState.clientName.trim()) {
     showToast("업체를 선택하거나 + 신규로 등록해주세요");
     return;
   }
+  const clientSnapshot = buildClientSnapshot(
+    poUploadState.channelId,
+    poUploadState.clientId,
+    poUploadState.clientName
+  );
 
   const channel = findChannel(poUploadState.channelId);
   const terms = getChannelTerms(appData, poUploadState.channelId);
@@ -1629,7 +1670,8 @@ function savePoUpload() {
   const savedChannelId = poUploadState.channelId;
   const version = saveProposal(appData, {
     channelId: poUploadState.channelId,
-    clientName: poUploadState.clientName,
+    clientId: clientSnapshot.clientId,
+    clientName: clientSnapshot.clientName,
     poDate: poUploadState.poDate,
     poNumber: poUploadState.poNumber,
     fobRate: 0,
@@ -1653,6 +1695,7 @@ function savePoUpload() {
 function bindPoUploadEvents() {
   document.getElementById("po-channel-select").addEventListener("change", (e) => {
     poUploadState.channelId = e.target.value;
+    poUploadState.clientId = "";
     poUploadState.clientName = "";
     if (poUploadState.mode === "manual") {
       poUploadState.manualSelected = [];
@@ -1710,13 +1753,16 @@ function bindPoUploadEvents() {
   const clientSelect = document.getElementById("po-client-select");
   if (clientSelect) {
     clientSelect.addEventListener("change", (e) => {
-      poUploadState.clientName = e.target.value;
+      const resolved = resolveClientFromSelect(poUploadState.channelId, e.target.value, "");
+      poUploadState.clientId = resolved.clientId;
+      poUploadState.clientName = resolved.clientName;
     });
   }
 
   document.getElementById("po-btn-quick-client")?.addEventListener("click", () => {
-    openAddClientModal(poUploadState.channelId, ({ name, channelId }) => {
+    openAddClientModal(poUploadState.channelId, ({ name, channelId, clientId }) => {
       poUploadState.channelId = channelId;
+      poUploadState.clientId = clientId || "";
       poUploadState.clientName = name;
       render();
     });
@@ -2407,7 +2453,10 @@ function bindMasterDeleteHandlers() {
         return;
       }
       if (masterEditClientId === id) masterEditClientId = null;
-      if (proposalState.clientName === name) proposalState.clientName = "";
+      if (proposalState.clientId === id || proposalState.clientName === name) {
+        proposalState.clientId = "";
+        proposalState.clientName = "";
+      }
       showToast(`업체 "${name}" 삭제됨`);
       render();
     });
