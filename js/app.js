@@ -289,11 +289,6 @@ function renderSalesChannelDetail(channelId, summary, monthLabel) {
                 ${p.poNumber ? `<span>발주번호 ${escapeAttr(p.poNumber)}</span>` : ""}
                 <span class="date">${formatProposalMoney(p.totalAmount, p, ch)}</span>
               </div>
-              <div class="sales-order-client-edit no-print">
-                <label>업체명</label>
-                <input type="text" class="input-cell sales-client-edit-input" data-order-id="${p.id}" value="${escapeAttr(getSalesClientLabel(p, ch))}" list="sales-client-suggestions-${channelId}">
-                <button type="button" class="btn btn-secondary btn-sm" data-save-order-client="${p.id}">업체명 저장</button>
-              </div>
               <div class="history-actions no-print">
                 <button class="btn btn-secondary btn-sm" data-view-proposal="${p.id}">보기</button>
                 <button class="btn btn-danger btn-sm" data-delete-proposal="${p.id}">삭제</button>
@@ -304,11 +299,6 @@ function renderSalesChannelDetail(channelId, summary, monthLabel) {
         </div>`;
         })
         .join("")}
-      <datalist id="sales-client-suggestions-${channelId}">
-        ${getClients(appData, channelId === "__orphan__" ? "" : channelId)
-          .map((c) => `<option value="${escapeAttr(c.name)}"></option>`)
-          .join("")}
-      </datalist>
     </div>
     <div id="sales-proposal-detail"></div>
   `;
@@ -2812,23 +2802,6 @@ function bindSalesEvents() {
       salesMonth = btn.dataset.jumpSalesMonth;
       salesChannelId = "";
       render();
-    });
-  });
-
-  document.querySelectorAll("[data-save-order-client]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const orderId = btn.dataset.saveOrderClient;
-      const input = document.querySelector(`[data-order-id="${orderId}"]`);
-      const result = updateOrderClientName(appData, orderId, input?.value || "");
-      if (!result.ok) {
-        showToast(result.error || "업체명 저장 실패");
-        return;
-      }
-      showToast("업체명이 저장되었습니다");
-      render();
-      if (salesChannelId) {
-        document.querySelector(".sales-channel-detail")?.scrollIntoView({ behavior: "smooth" });
-      }
     });
   });
 

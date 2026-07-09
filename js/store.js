@@ -455,20 +455,6 @@ function getSalesClientLabel(proposal, channel) {
   return `발주 v${proposal.version}`;
 }
 
-function updateOrderClientName(data, orderId, clientName) {
-  const order = data.proposals.find((p) => p.id === orderId);
-  if (!order || getRecordType(order) !== "order") {
-    return { ok: false, error: "발주서를 찾을 수 없습니다." };
-  }
-  const trimmed = String(clientName || "").trim();
-  if (!trimmed) return { ok: false, error: "업체명을 입력해주세요." };
-  order.clientName = trimmed;
-  order.salesClientName = trimmed;
-  order.buyerName = trimmed;
-  saveData(data);
-  return { ok: true };
-}
-
 function buildSalesSummary(data, yearMonth) {
   const proposals = filterProposalsByMonth(getOrders(data), yearMonth);
   const clientMap = {};
