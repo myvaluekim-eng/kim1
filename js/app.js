@@ -781,16 +781,26 @@ function resolveClientFromSelect(channelId, selectValue, fallbackName) {
   return { clientId: "", clientName: legacyName };
 }
 
-function buildClientSnapshot(channelId, clientId, clientName) {
-  const trimmed = String(clientName || "").trim();
-  if (clientId) {
-    const client = getClients(appData, channelId).find((c) => c.id === clientId);
-    return {
-      clientId,
-      clientName: trimmed || client?.name || "",
-    };
-  }
-  return { clientId: null, clientName: trimmed };
+function readPoClientFromDom() {
+  const channelSelect = document.getElementById("po-channel-select");
+  const clientSelect = document.getElementById("po-client-select");
+  const channelId = channelSelect?.value || "";
+  const clientId = clientSelect?.value || "";
+  if (!channelId || !clientId) return null;
+  const client = getClients(appData, channelId).find((c) => c.id === clientId);
+  if (!client) return null;
+  return { channelId, clientId: client.id, clientName: client.name };
+}
+
+function readProposalClientFromDom() {
+  const channelSelect = document.getElementById("channel-select");
+  const clientSelect = document.getElementById("client-select");
+  const channelId = channelSelect?.value || "";
+  const clientId = clientSelect?.value || "";
+  if (!channelId || !clientId) return null;
+  const client = getClients(appData, channelId).find((c) => c.id === clientId);
+  if (!client) return null;
+  return { channelId, clientId: client.id, clientName: client.name };
 }
 
 function renderProposal() {
@@ -1027,21 +1037,15 @@ function bindProposalEvents() {
   });
 
   document.getElementById("btn-save").addEventListener("click", () => {
-    const select = document.getElementById("client-select");
-    if (select?.value) {
-      const resolved = resolveClientFromSelect(proposalState.channelId, select.value, proposalState.clientName);
-      proposalState.clientId = resolved.clientId;
-      proposalState.clientName = resolved.clientName;
-    }
-    if (!proposalState.clientName.trim()) {
-      showToast("업체를 선택하거나 + 신규로 등록해주세요");
+    const selected = readProposalClientFromDom();
+    if (!selected) {
+      showToast("업체를 선택해주세요");
       return;
     }
-    const clientSnapshot = buildClientSnapshot(
-      proposalState.channelId,
-      proposalState.clientId,
-      proposalState.clientName
-    );
+    proposalState.channelId = selected.channelId;
+    proposalState.clientId = selected.clientId;
+    proposalState.clientName = selected.clientName;
+    const channel = findChannel(selected.channelId);
     const products = getProducts(appData);
     const terms = getChannelTerms(appData, proposalState.channelId);
     const items = products.map((p) => {
@@ -1056,9 +1060,9 @@ function bindProposalEvents() {
     });
     const totalAmount = items.reduce((s, i) => s + i.amount, 0);
     const version = saveProposal(appData, {
-      channelId: proposalState.channelId,
-      clientId: clientSnapshot.clientId,
-      clientName: clientSnapshot.clientName,
+      channelId: selected.channelId,
+      clientId: selected.clientId,
+      clientName: selected.clientName,
       poDate: proposalState.poDate,
       fobRate: proposalState.fobRate,
       exchangeRate: proposalState.exchangeRate,
@@ -1172,9 +1176,14 @@ function mapParsedPoRows(rows) {
 
 function renderPoReviewSection(channel, rows) {
   const totalAmount = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
+  const selectedClient = readPoClientFromDom();
+  const clientHint = selectedClient
+    ? `<p class="po-save-client-hint">저장 업체: <strong>${escapeAttr(selectedClient.clientName)}</strong> · ${escapeAttr(findChannel(selectedClient.channelId).name)}</p>`
+    : `<p class="po-save-client-hint po-save-client-warn">⚠️ 저장 전 업체를 선택해주세요</p>`;
   return `
     <div class="section-block">
       <div class="section-label">④ ${rows.length ? `인식 결과 (${rows.length}건)` : "품목 입력"}</div>
+      ${clientHint}
       <div class="table-wrap">
         <table class="po-review-table">
           <thead>
@@ -1585,21 +1594,14 @@ function updatePoTotals() {
 }
 
 function savePoUpload() {
-  const select = document.getElementById("po-client-select");
-  if (select?.value) {
-    const resolved = resolveClientFromSelect(poUploadState.channelId, select.value, poUploadState.clientName);
-    poUploadState.clientId = resolved.clientId;
-    poUploadState.clientName = resolved.clientName;
-  }
-  if (!poUploadState.clientName.trim()) {
-    showToast("업체를 선택하거나 + 신규로 등록해주세요");
+  const selected = readPoClientFromDom();
+  if (!selected) {
+    showToast("업체를 드롭다운에서 선택해주세요");
     return;
   }
-  const clientSnapshot = buildClientSnapshot(
-    poUploadState.channelId,
-    poUploadState.clientId,
-    poUploadState.clientName
-  );
+  poUploadState.channelId = selected.channelId;
+  poUploadState.clientId = selected.clientId;
+  poUploadState.clientName = selected.clientName;
 
   const channel = findChannel(poUploadState.channelId);
   const terms = getChannelTerms(appData, poUploadState.channelId);
@@ -1669,9 +1671,9 @@ function savePoUpload() {
   const savedMonth = (poUploadState.poDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
   const savedChannelId = poUploadState.channelId;
   const version = saveProposal(appData, {
-    channelId: poUploadState.channelId,
-    clientId: clientSnapshot.clientId,
-    clientName: clientSnapshot.clientName,
+    channelId: selected.channelId,
+    clientId: selected.clientId,
+    clientName: selected.clientName,
     poDate: poUploadState.poDate,
     poNumber: poUploadState.poNumber,
     fobRate: 0,
@@ -1753,9 +1755,23 @@ function bindPoUploadEvents() {
   const clientSelect = document.getElementById("po-client-select");
   if (clientSelect) {
     clientSelect.addEventListener("change", (e) => {
-      const resolved = resolveClientFromSelect(poUploadState.channelId, e.target.value, "");
+      const channelId = document.getElementById("po-channel-select")?.value || poUploadState.channelId;
+      const resolved = resolveClientFromSelect(channelId, e.target.value, "");
+      poUploadState.channelId = channelId;
       poUploadState.clientId = resolved.clientId;
       poUploadState.clientName = resolved.clientName;
+      if (poUploadState.status === "done" || poUploadState.rows.length) {
+        const hint = document.querySelector(".po-save-client-hint");
+        if (hint) {
+          if (resolved.clientName) {
+            hint.className = "po-save-client-hint";
+            hint.innerHTML = `저장 업체: <strong>${escapeAttr(resolved.clientName)}</strong> · ${escapeAttr(findChannel(channelId).name)}`;
+          } else {
+            hint.className = "po-save-client-hint po-save-client-warn";
+            hint.textContent = "⚠️ 저장 전 업체를 선택해주세요";
+          }
+        }
+      }
     });
   }
 

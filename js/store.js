@@ -92,14 +92,6 @@ function migrateData(data) {
       });
     });
   }
-  data.proposals.forEach((p) => {
-    if (!p.clientId && p.clientName) {
-      const match = (data.clients || []).find(
-        (c) => c.channelId === p.channelId && c.name === p.clientName
-      );
-      if (match) p.clientId = match.id;
-    }
-  });
   return data;
 }
 
@@ -401,19 +393,12 @@ function orderMatchesClient(proposal, client) {
 }
 
 function getSalesClientKey(proposal) {
-  if (proposal.clientId) return `${proposal.channelId}::id:${proposal.clientId}`;
-  const name = String(proposal.clientName || "").trim();
-  return `${proposal.channelId}::name:${name}`;
+  const name = String(proposal.clientName || "").trim() || "미지정";
+  return `${proposal.channelId}::${name}`;
 }
 
-function getSalesClientLabel(proposal, data) {
-  const snapshot = String(proposal.clientName || "").trim();
-  if (snapshot) return snapshot;
-  if (proposal.clientId) {
-    const client = (data.clients || []).find((c) => c.id === proposal.clientId);
-    if (client?.name) return client.name;
-  }
-  return "미지정";
+function getSalesClientLabel(proposal) {
+  return String(proposal.clientName || "").trim() || "미지정";
 }
 
 function buildSalesSummary(data, yearMonth) {
@@ -428,7 +413,7 @@ function buildSalesSummary(data, yearMonth) {
         channelId: p.channelId,
         channelName: ch?.name || p.channelId,
         clientId: p.clientId || null,
-        clientName: getSalesClientLabel(p, data),
+        clientName: getSalesClientLabel(p),
         count: 0,
         totalKrw: 0,
         totalUsd: 0,

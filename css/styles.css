@@ -1137,6 +1137,19 @@ body {
   color: #92400e;
 }
 
+.po-save-client-hint {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--primary-light);
+  font-size: 14px;
+}
+
+.po-save-client-warn {
+  background: var(--warning-light);
+  color: #92400e;
+}
+
 .po-empty-hint {
   text-align: center;
   color: var(--text-muted);
