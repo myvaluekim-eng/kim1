@@ -1976,9 +1976,19 @@ function bindPoUploadEvents() {
   document.getElementById("po-btn-save")?.addEventListener("click", savePoUpload);
 }
 
+function computeCbmFromCartonSize(text) {
+  const nums = String(text || "")
+    .split(/[x*×]/i)
+    .map((s) => parseFloat(s.replace(/[^0-9.\-]/g, "")))
+    .filter((n) => !isNaN(n));
+  if (nums.length < 3) return 0;
+  return (nums[0] * nums[1] * nums[2]) / 1000000;
+}
+
 function parseProductForm(fd) {
+  const cartonSize = fd.get("cartonSize").trim() || "";
   return {
-    code: fd.get("code").trim(),
+    code: generateNextProductCode(getProducts(appData).map((p) => p.code)),
     category: fd.get("category").trim(),
     nameKor: fd.get("nameKor").trim(),
     nameEng: fd.get("nameEng").trim(),
@@ -1986,12 +1996,11 @@ function parseProductForm(fd) {
     hsCode: fd.get("hsCode")?.trim() || "",
     size: fd.get("size").trim() || "",
     cartonQty: Number(fd.get("cartonQty")) || 50,
-    cartonSize: fd.get("cartonSize").trim() || "",
+    cartonSize,
     cartonWeight: parseOptionalNumber(fd.get("cartonWeight")),
-    cbm: Number(fd.get("cbm")) || 0,
+    cbm: computeCbmFromCartonSize(cartonSize),
     shelfLife: Number(fd.get("shelfLife")) || 24,
     srpKrw: parseOptionalNumber(fd.get("srpKrw")),
-    srpUsd: parseOptionalNumber(fd.get("srpUsd")),
     fobUsd: parseOptionalNumber(fd.get("fobUsd")),
     fobKrw: parseOptionalNumber(fd.get("fobKrw")),
     fobRate:
@@ -2033,11 +2042,6 @@ function renderProductForm(editProduct = null) {
             <input type="text" name="category" placeholder="Serum" required value="${escapeAttr(p.category || "")}">
           </div>
           <div class="form-group">
-            <label>제품코드 *</label>
-            <input type="text" name="code" placeholder="Br-0015" required
-              value="${escapeAttr(p.code || "")}" ${isEdit ? "readonly class=\"input-readonly\"" : ""}>
-          </div>
-          <div class="form-group">
             <label>바코드</label>
             <input type="text" name="barcode" placeholder="8800259230xxx" value="${escapeAttr(p.barcode || "")}">
           </div>
@@ -2065,11 +2069,6 @@ function renderProductForm(editProduct = null) {
             <label>기준 소비자가 (₩)</label>
             <input type="number" name="srpKrw" step="1" min="0" placeholder="39000"
               value="${p.srpKrw ?? ""}">
-          </div>
-          <div class="form-group">
-            <label>기준 소비자가 ($)</label>
-            <input type="number" name="srpUsd" step="0.01" min="0" placeholder="29.59"
-              value="${p.srpUsd ?? ""}">
           </div>
           <div class="form-group">
             <label>공급가율 (%)</label>
@@ -2119,10 +2118,6 @@ function renderProductForm(editProduct = null) {
           <div class="form-group">
             <label>카톤박스 중량 (kg)</label>
             <input type="number" name="cartonWeight" step="0.01" min="0" value="${p.cartonWeight ?? ""}">
-          </div>
-          <div class="form-group">
-            <label>CBM</label>
-            <input type="number" name="cbm" step="0.00001" value="${p.cbm ?? 0.02}" min="0">
           </div>
           <div class="form-group">
             <label>1팔레트 카톤수</label>
@@ -2729,7 +2724,6 @@ function renderProducts() {
             <tr>
               <th>NO.</th>
               <th>카테고리</th>
-              <th>제품코드</th>
               <th>바코드</th>
               <th>제품명 (KOR)</th>
               <th>제품명 (ENG)</th>
@@ -2737,7 +2731,6 @@ function renderProducts() {
               <th>용량</th>
               <th>유통기한</th>
               <th>기준가(₩)</th>
-              <th>기준가($)</th>
               <th>공급가율(%)</th>
               <th>FOB(₩)</th>
               <th>FOB($)</th>
@@ -2750,7 +2743,6 @@ function renderProducts() {
               <th>제품중량</th>
               <th>카톤사이즈</th>
               <th>카톤중량</th>
-              <th>CBM</th>
               <th>팔레트(CTN)</th>
               <th>팔레트(PCS)</th>
               <th>팔레트중량</th>
@@ -2765,7 +2757,6 @@ function renderProducts() {
               <tr class="${productEditCode === p.code ? "row-editing" : ""}">
                 <td>${i + 1}</td>
                 <td>${p.category}</td>
-                <td><code>${p.code}</code></td>
                 <td style="font-size:12px">${p.barcode || "—"}</td>
                 <td>${p.nameKor}</td>
                 <td style="font-size:12px;color:var(--text-muted)">${p.nameEng}</td>
@@ -2773,7 +2764,6 @@ function renderProducts() {
                 <td>${p.size || "—"}</td>
                 <td>${p.shelfLife}개월</td>
                 <td>${p.srpKrw != null ? formatKrw(p.srpKrw) : "—"}</td>
-                <td>${p.srpUsd != null ? formatUsd(p.srpUsd) : "—"}</td>
                 <td>${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 + "%" : "—"}</td>
                 <td>${p.fobKrw != null ? formatKrw(p.fobKrw) : "—"}</td>
                 <td>${p.fobUsd != null ? formatUsd(p.fobUsd) : "—"}</td>
@@ -2786,7 +2776,6 @@ function renderProducts() {
                 <td>${p.productWeight ?? "—"}</td>
                 <td style="font-size:12px">${p.cartonSize || "—"}</td>
                 <td>${p.cartonWeight ?? "—"}</td>
-                <td>${p.cbm}</td>
                 <td>${p.palletCartons ?? "—"}</td>
                 <td>${p.palletPcs ?? "—"}</td>
                 <td>${p.palletWeight ?? "—"}</td>
