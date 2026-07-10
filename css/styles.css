@@ -1759,7 +1759,7 @@ td.total-row {
 .proposal-doc-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 10px;
+  font-size: 12px;
   table-layout: fixed;
 }
 
@@ -1795,8 +1795,8 @@ td.total-row {
 }
 
 .proposal-doc-meta-row td {
-  font-size: 9px;
-  padding: 2px 5px;
+  font-size: 11px;
+  padding: 3px 6px;
   border: 1px solid #000;
   vertical-align: middle;
 }
@@ -1818,11 +1818,11 @@ td.total-row {
 }
 
 .proposal-doc-colhead td {
-  padding: 2px 4px 3px;
+  padding: 3px 5px 4px;
   vertical-align: top;
   text-align: center;
   font-weight: 700;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.1;
   border: 1px solid #000;
 }

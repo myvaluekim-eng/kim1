@@ -206,7 +206,6 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
 function buildProposalDocumentHtml(proposal) {
   const channel = getChannelList().find((c) => c.id === proposal.channelId);
   const items = getProposalDisplayItems(proposal);
-  const totals = getProposalDisplayTotals(items, channel);
   const terms = proposal.terms || [];
   const currency = getProposalCurrency(proposal, channel);
   const currencySymbol = currency === "KRW" ? "₩" : "$";
@@ -240,10 +239,6 @@ function buildProposalDocumentHtml(proposal) {
         <td class="num">${item.palletPcs ?? "—"}</td>
         <td class="num">${item.palletWeight ?? "—"}</td>
         <td>${item.countryOrigin || "—"}</td>
-        <td class="num">${item.poQty || 0}</td>
-        <td class="num">${formatNumber(item.ctn, 2)}</td>
-        <td class="num">${formatNumber(item.cbmQty, 4)}</td>
-        <td class="num">${formatMoney(item.amount, currency)}</td>
       </tr>`
     )
     .join("");
@@ -274,14 +269,10 @@ function buildProposalDocumentHtml(proposal) {
           <col class="col-num">
           <col class="col-num">
           <col class="col-code">
-          <col class="col-qty">
-          <col class="col-num">
-          <col class="col-num">
-          <col class="col-amount">
         </colgroup>
         <tbody class="proposal-doc-sheet">
           <tr class="proposal-doc-head-title">
-            <td colspan="26">
+            <td colspan="22">
               <div class="proposal-doc-head-main">PRODUCT &amp; PRICE LIST</div>
               <div class="proposal-doc-head-subline">Barle Cosmetics</div>
             </td>
@@ -294,15 +285,13 @@ function buildProposalDocumentHtml(proposal) {
             <td class="meta-label">Market</td>
             <td colspan="2">${channel?.name || "—"}</td>
             <td class="meta-label">Ver.</td>
-            <td colspan="15">${proposal.version}</td>
+            <td colspan="11">${proposal.version}</td>
           </tr>
           <tr class="proposal-doc-meta-row">
             <td class="meta-label">FOB</td>
             <td colspan="2">${proposal.fobRate}%</td>
             <td class="meta-label">Exchange</td>
-            <td colspan="3">1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")}</td>
-            <td class="meta-label">Total</td>
-            <td colspan="18">${formatMoney(totals.totalAmount, currency)}</td>
+            <td colspan="18">1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")}</td>
           </tr>
           <tr class="proposal-doc-colhead">
             <td>Category</td>
@@ -327,18 +316,8 @@ function buildProposalDocumentHtml(proposal) {
             <td>Pallet (PCS)</td>
             <td>Pallet Wt (kg)</td>
             <td>Origin</td>
-            <td>Qty</td>
-            <td>CTN</td>
-            <td>CBM</td>
-            <td>Amount</td>
           </tr>
           ${tableRows}
-          <tr class="proposal-doc-total">
-            <td colspan="23" class="total-label">TOTAL</td>
-            <td class="num">${formatNumber(totals.totalCtn, 2)}</td>
-            <td class="num">${formatNumber(totals.totalCbm, 4)}</td>
-            <td class="num">${formatMoney(totals.totalAmount, currency)}</td>
-          </tr>
         </tbody>
       </table>
 
@@ -458,16 +437,22 @@ async function exportProposalToPdf(proposal) {
     return;
   }
 
+  const isEstimate = getRecordType(proposal) === "estimate";
   const container = document.createElement("div");
   container.className = "proposal-pdf-root";
-  container.innerHTML =
-    getRecordType(proposal) === "estimate"
-      ? buildEstimateDocumentHtml(proposal)
-      : buildProposalDocumentHtml(proposal);
+  container.innerHTML = isEstimate ? buildEstimateDocumentHtml(proposal) : buildProposalDocumentHtml(proposal);
+  if (!isEstimate) {
+    container.style.width = "2100px";
+  }
   document.body.appendChild(container);
 
   const el = container.querySelector(".proposal-doc");
   window.scrollTo(0, 0);
+
+  const pxToMm = (px) => (px / 96) * 25.4;
+  const jsPDF = isEstimate
+    ? { unit: "mm", format: "a4", orientation: "landscape" }
+    : { unit: "mm", format: [pxToMm(2100), 210], orientation: "landscape" };
 
   try {
     await html2pdf()
@@ -485,7 +470,7 @@ async function exportProposalToPdf(proposal) {
           scrollY: 0,
           y: 0,
         },
-        jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+        jsPDF,
         pagebreak: { mode: ["css", "legacy"], avoid: ".proposal-doc-terms" },
       })
       .from(el)
