@@ -871,19 +871,18 @@ function renderProposal() {
     return `
       <tr data-code="${p.code}">
         <td>${p.category}</td>
-        <td>
-          <strong>${p.nameKor}</strong>
-          ${p.nameEng ? `<br><span style="font-size:12px;color:var(--text-muted)">${p.nameEng}</span>` : ""}
-        </td>
         <td style="font-size:12px">${p.barcode || "—"}</td>
+        <td>${p.nameKor}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${p.nameEng}</td>
         <td style="font-size:12px">${p.hsCode || "—"}</td>
         <td>${p.size}</td>
         <td>${p.shelfLife ?? "—"}</td>
-        <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
-        <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
+        <td>${p.srpKrw != null ? formatKrw(p.srpKrw) : "—"}</td>
         <td>${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 + "%" : "—"}</td>
         <td class="auto" data-fob-krw="${p.code}">${formatKrw(fobKrw)}</td>
         <td class="auto" data-fob-usd="${p.code}">${formatUsd(fobUsd)}</td>
+        <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
+        <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
         <td>${p.cartonQty ?? "—"}</td>
         <td>${p.moqPcs ?? "—"}</td>
         <td>${p.moq}</td>
@@ -894,6 +893,7 @@ function renderProposal() {
         <td>${p.palletCartons ?? "—"}</td>
         <td>${p.palletPcs ?? "—"}</td>
         <td>${p.palletWeight ?? "—"}</td>
+        <td>${p.countryOrigin || "—"}</td>
         <td class="editable">
           <input class="input-cell qty" type="number" step="1" min="0"
             data-field="poQty" data-code="${p.code}" value="${item.poQty || ""}" placeholder="0">
@@ -985,16 +985,18 @@ function renderProposal() {
           <thead>
             <tr>
               <th>Category</th>
-              <th>Product</th>
               <th>Barcode</th>
+              <th>Product (KOR)</th>
+              <th>Product (ENG)</th>
               <th>HS Code</th>
               <th>Size</th>
               <th>Shelf Life</th>
-              <th>MSRP (₩)</th>
-              <th>MAPP (₩)</th>
+              <th>SRP (₩)</th>
               <th>FOB Rate (%)</th>
               <th class="col-auto">FOB (₩)</th>
               <th class="col-auto">FOB ($)</th>
+              <th>MSRP (₩)</th>
+              <th>MAPP (₩)</th>
               <th>Ctn Qty</th>
               <th>MOQ (PCS)</th>
               <th>MOQ (CTN)</th>
@@ -1005,6 +1007,7 @@ function renderProposal() {
               <th>Pallet (CTN)</th>
               <th>Pallet (PCS)</th>
               <th>Pallet Wt (kg)</th>
+              <th>Origin</th>
               <th class="col-editable">Order Qty</th>
               <th class="col-auto">CTN</th>
               <th class="col-auto">CBM</th>
@@ -1014,7 +1017,7 @@ function renderProposal() {
           <tbody>${rows}</tbody>
           <tfoot>
             <tr>
-              <td colspan="22" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
+              <td colspan="25" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
               <td class="total-row" id="total-ctn">${formatNumber(totalCtn, 2)}</td>
               <td class="total-row" id="total-cbm">${formatNumber(totalCbm, 4)}</td>
               <td class="total-row" id="total-amount">${formatMoney(totalAmount, channel)}</td>

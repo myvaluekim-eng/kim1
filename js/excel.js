@@ -25,11 +25,12 @@ function exportProposalToExcel(proposal) {
       "HS Code",
       "Size",
       "Shelf Life",
-      "MSRP (₩)",
-      "MAPP (₩)",
+      "SRP (₩)",
       "FOB Rate (%)",
       "FOB (₩)",
       "FOB ($)",
+      "MSRP (₩)",
+      "MAPP (₩)",
       "Ctn Qty",
       "MOQ (PCS)",
       "MOQ (CTN)",
@@ -40,6 +41,7 @@ function exportProposalToExcel(proposal) {
       "Pallet (CTN)",
       "Pallet (PCS)",
       "Pallet Wt (kg)",
+      "Origin",
       "Order Qty",
       "CTN",
       "CBM",
@@ -56,11 +58,12 @@ function exportProposalToExcel(proposal) {
       item.hsCode || "",
       item.size || "",
       item.shelfLife ?? "",
-      item.msrpKrw ?? "",
-      item.mappKrw ?? "",
+      item.srpKrw ?? "",
       item.productFobRate != null ? Math.round(item.productFobRate * 1000) / 10 : "",
       item.fobKrw ?? "",
       item.fobUsd ?? "",
+      item.msrpKrw ?? "",
+      item.mappKrw ?? "",
       item.cartonQty ?? "",
       item.moqPcs ?? "",
       item.moq ?? "",
@@ -71,6 +74,7 @@ function exportProposalToExcel(proposal) {
       item.palletCartons ?? "",
       item.palletPcs ?? "",
       item.palletWeight ?? "",
+      item.countryOrigin || "",
       item.poQty ?? 0,
       item.ctn ?? "",
       item.cbmQty ?? "",
@@ -79,18 +83,18 @@ function exportProposalToExcel(proposal) {
   });
 
   rows.push([]);
-  const totalRow = new Array(26).fill("");
+  const totalRow = new Array(28).fill("");
   totalRow[0] = "TOTAL";
-  totalRow[23] = totals.totalCtn;
-  totalRow[24] = totals.totalCbm;
-  totalRow[25] = totals.totalAmount;
+  totalRow[25] = totals.totalCtn;
+  totalRow[26] = totals.totalCbm;
+  totalRow[27] = totals.totalAmount;
   rows.push(totalRow);
   rows.push([]);
   rows.push(["Terms & Conditions"]);
   (proposal.terms || []).forEach((t) => rows.push([t]));
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = new Array(26).fill({ wch: 12 });
+  ws["!cols"] = new Array(28).fill({ wch: 12 });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, ch.name.slice(0, 31));
