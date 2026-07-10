@@ -1359,6 +1359,26 @@ tbody tr:hover {
   background: #fafbfc;
 }
 
+/* Freeze Category/Barcode/Product columns so product name stays visible on horizontal scroll */
+#proposal-table th:nth-child(1),
+#proposal-table td:nth-child(1) { position: sticky; left: 0; z-index: 2; width: 90px; }
+#proposal-table th:nth-child(2),
+#proposal-table td:nth-child(2) { position: sticky; left: 90px; z-index: 2; width: 120px; }
+#proposal-table th:nth-child(3),
+#proposal-table td:nth-child(3) { position: sticky; left: 210px; z-index: 2; width: 150px; }
+#proposal-table th:nth-child(4),
+#proposal-table td:nth-child(4) {
+  position: sticky;
+  left: 360px;
+  z-index: 2;
+  width: 170px;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+}
+
+#proposal-table thead th:nth-child(-n + 4) { background: var(--bg-soft); z-index: 3; }
+#proposal-table tbody td:nth-child(-n + 4) { background: #fff; }
+#proposal-table tbody tr:hover td:nth-child(-n + 4) { background: #fafbfc; }
+
 td.editable {
   background: #fffdf5;
 }

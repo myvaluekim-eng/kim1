@@ -93,6 +93,7 @@ let appData = loadData();
 let currentView = "dashboard";
 let historyFilter = "";
 let historyRecordType = "quote";
+let estimatePanelOpen = false;
 let clientFilter = "";
 let salesMonth = new Date().toISOString().slice(0, 7);
 let salesChannelId = "";
@@ -219,6 +220,28 @@ function calcAmount(fobUsd, fobKrw, poQty, currency) {
     return (fobKrw ?? 0) * poQty;
   }
   return (fobUsd ?? 0) * poQty;
+}
+
+function computeEstimateTotals(products) {
+  let totalAmount = 0;
+  let totalCtn = 0;
+  let totalCbm = 0;
+  products.forEach((p) => {
+    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+    const { fobUsd, fobKrw } = calcFobFromSrp(
+      item.srpKrw,
+      item.srpUsd,
+      proposalState.fobRate,
+      proposalState.exchangeRate
+    );
+    const ctn = calcCtn(item.poQty, p.cartonQty);
+    const cbmQty = calcCbmQty(ctn, p.cbm);
+    const amount = calcAmount(fobUsd, fobKrw, item.poQty, proposalState.currency);
+    totalAmount += amount;
+    totalCtn += ctn;
+    totalCbm += cbmQty;
+  });
+  return { totalAmount, totalCtn, totalCbm };
 }
 
 function formatKrw(value) {
@@ -859,9 +882,6 @@ function renderProposal() {
   const products = getProducts(appData);
   const terms = getChannelTerms(appData, proposalState.channelId);
   const channelClients = getClients(appData, proposalState.channelId);
-  let totalAmount = 0;
-  let totalCtn = 0;
-  let totalCbm = 0;
 
   const rows = products.map((p) => {
     const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
@@ -871,12 +891,6 @@ function renderProposal() {
       proposalState.fobRate,
       proposalState.exchangeRate
     );
-    const ctn = calcCtn(item.poQty, p.cartonQty);
-    const cbmQty = calcCbmQty(ctn, p.cbm);
-    const amount = calcAmount(fobUsd, fobKrw, item.poQty, proposalState.currency);
-    totalAmount += amount;
-    totalCtn += ctn;
-    totalCbm += cbmQty;
 
     return `
       <tr data-code="${p.code}">
@@ -903,15 +917,39 @@ function renderProposal() {
         <td>${p.palletPcs ?? "—"}</td>
         <td>${p.palletWeight ?? "—"}</td>
         <td>${p.countryOrigin || "—"}</td>
+      </tr>`;
+  }).join("");
+
+  const estimateRows = products.map((p) => {
+    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+    const { fobUsd, fobKrw } = calcFobFromSrp(
+      item.srpKrw,
+      item.srpUsd,
+      proposalState.fobRate,
+      proposalState.exchangeRate
+    );
+    const ctn = calcCtn(item.poQty, p.cartonQty);
+    const cbmQty = calcCbmQty(ctn, p.cbm);
+    const amount = calcAmount(fobUsd, fobKrw, item.poQty, proposalState.currency);
+
+    return `
+      <tr data-code="${p.code}">
+        <td>
+          <strong>${p.nameKor}</strong>
+          ${p.nameEng ? `<br><span style="font-size:12px;color:var(--text-muted)">${p.nameEng}</span>` : ""}
+        </td>
+        <td class="auto" data-est-price="${p.code}">${proposalState.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd)}</td>
         <td class="editable">
           <input class="input-cell qty" type="number" step="1" min="0"
             data-field="poQty" data-code="${p.code}" value="${item.poQty || ""}" placeholder="0">
         </td>
-        <td class="auto" data-ctn="${p.code}">${formatNumber(ctn, 2)}</td>
-        <td class="auto" data-cbm="${p.code}">${formatNumber(cbmQty, 4)}</td>
-        <td class="auto" data-amount="${p.code}">${formatMoney(amount, proposalState.currency)}</td>
+        <td class="auto" data-est-ctn="${p.code}">${formatNumber(ctn, 2)}</td>
+        <td class="auto" data-est-cbm="${p.code}">${formatNumber(cbmQty, 4)}</td>
+        <td class="auto" data-est-amount="${p.code}">${formatMoney(amount, proposalState.currency)}</td>
       </tr>`;
   }).join("");
+
+  const estimateTotals = computeEstimateTotals(products);
 
   return `
     <div class="card">
@@ -962,7 +1000,7 @@ function renderProposal() {
           <button type="button" class="btn btn-secondary" id="btn-pdf-proposal">📄 PDF 저장</button>
           <button type="button" class="btn btn-secondary" id="btn-print">🖨 인쇄</button>
           <button type="button" class="btn btn-success" id="btn-save">💾 저장하기</button>
-          <button type="button" class="btn btn-primary" id="btn-save-estimate">🧾 견적서</button>
+          <button type="button" class="btn btn-primary" id="btn-toggle-estimate">🧾 견적서${estimatePanelOpen ? " 닫기" : ""}</button>
         </div>
       </div>
     </div>
@@ -1024,24 +1062,51 @@ function renderProposal() {
               <th>Pallet (PCS)</th>
               <th>Pallet Wt (kg)</th>
               <th>Origin</th>
-              <th class="col-editable">Order Qty</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    ${
+      estimatePanelOpen
+        ? `
+    <div class="section-block" id="estimate-panel">
+      <div class="section-label">④ 견적서 — 주문수량 입력</div>
+      <div class="legend-bar no-print">
+        <span class="legend-item"><span class="legend-swatch editable"></span> 직접 입력</span>
+        <span class="legend-item"><span class="legend-swatch auto"></span> 자동 계산</span>
+      </div>
+      <div class="table-wrap">
+        <table id="estimate-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th class="col-auto">Price (${proposalState.currency === "KRW" ? "₩" : "$"})</th>
+              <th class="col-editable">Qty</th>
               <th class="col-auto">CTN</th>
               <th class="col-auto">CBM</th>
               <th class="col-auto">Amount</th>
             </tr>
           </thead>
-          <tbody>${rows}</tbody>
+          <tbody>${estimateRows}</tbody>
           <tfoot>
             <tr>
-              <td colspan="24" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
-              <td class="total-row" id="total-ctn">${formatNumber(totalCtn, 2)}</td>
-              <td class="total-row" id="total-cbm">${formatNumber(totalCbm, 4)}</td>
-              <td class="total-row" id="total-amount">${formatMoney(totalAmount, proposalState.currency)}</td>
+              <td colspan="3" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
+              <td class="total-row" id="est-total-ctn">${formatNumber(estimateTotals.totalCtn, 2)}</td>
+              <td class="total-row" id="est-total-cbm">${formatNumber(estimateTotals.totalCbm, 4)}</td>
+              <td class="total-row" id="est-total-amount">${formatMoney(estimateTotals.totalAmount, proposalState.currency)}</td>
             </tr>
           </tfoot>
         </table>
       </div>
-    </div>
+      <div class="proposal-meta-actions no-print" style="margin-top:16px">
+        <button type="button" class="btn btn-success" id="btn-save-estimate">💾 견적서 저장</button>
+      </div>
+    </div>`
+        : ""
+    }
 
     <div class="terms-box">
       <h4>거래 조건 (Terms & Conditions) — ${channel.name}</h4>
@@ -1107,16 +1172,17 @@ function bindProposalEvents() {
     render();
   });
 
-  document.querySelectorAll("#proposal-table input").forEach((input) => {
+  document.getElementById("btn-toggle-estimate").addEventListener("click", () => {
+    estimatePanelOpen = !estimatePanelOpen;
+    render();
+  });
+
+  document.querySelectorAll("#estimate-table input").forEach((input) => {
     input.addEventListener("input", (e) => {
       const code = e.target.dataset.code;
       const field = e.target.dataset.field;
-      if (field === "poQty") {
-        proposalState.items[code][field] = parseFloat(e.target.value) || 0;
-      } else {
-        proposalState.items[code][field] = parseOptionalNumber(e.target.value);
-      }
-      updateProposalCalcs(channel);
+      proposalState.items[code][field] = parseFloat(e.target.value) || 0;
+      updateEstimateCalcs(channel);
     });
   });
 
@@ -1159,7 +1225,7 @@ function bindProposalEvents() {
     showToast(`단가표 저장 완료 — v${version} (지난 단가표에서 확인)`);
   });
 
-  document.getElementById("btn-save-estimate").addEventListener("click", () => {
+  document.getElementById("btn-save-estimate")?.addEventListener("click", () => {
     const selected = readProposalClientFromDom();
     if (!selected) {
       showToast("업체를 선택해주세요");
@@ -1245,10 +1311,23 @@ function bindProposalEvents() {
 }
 
 function updateProposalCalcs(channel) {
-  let totalAmount = 0;
-  let totalCtn = 0;
-  let totalCbm = 0;
+  const products = getProducts(appData);
+  products.forEach((p) => {
+    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+    const { fobUsd, fobKrw } = calcFobFromSrp(
+      item.srpKrw,
+      item.srpUsd,
+      proposalState.fobRate,
+      proposalState.exchangeRate
+    );
+    const fobEl = document.querySelector(`[data-fob="${p.code}"]`);
+    if (fobEl) fobEl.textContent = proposalState.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd);
+  });
 
+  if (estimatePanelOpen) updateEstimateCalcs(channel);
+}
+
+function updateEstimateCalcs(channel) {
   const products = getProducts(appData);
   products.forEach((p) => {
     const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
@@ -1261,26 +1340,24 @@ function updateProposalCalcs(channel) {
     const ctn = calcCtn(item.poQty, p.cartonQty);
     const cbmQty = calcCbmQty(ctn, p.cbm);
     const amount = calcAmount(fobUsd, fobKrw, item.poQty, proposalState.currency);
-    totalAmount += amount;
-    totalCtn += ctn;
-    totalCbm += cbmQty;
 
-    const fobEl = document.querySelector(`[data-fob="${p.code}"]`);
-    const ctnEl = document.querySelector(`[data-ctn="${p.code}"]`);
-    const cbmEl = document.querySelector(`[data-cbm="${p.code}"]`);
-    const amtEl = document.querySelector(`[data-amount="${p.code}"]`);
-    if (fobEl) fobEl.textContent = proposalState.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd);
+    const priceEl = document.querySelector(`[data-est-price="${p.code}"]`);
+    const ctnEl = document.querySelector(`[data-est-ctn="${p.code}"]`);
+    const cbmEl = document.querySelector(`[data-est-cbm="${p.code}"]`);
+    const amtEl = document.querySelector(`[data-est-amount="${p.code}"]`);
+    if (priceEl) priceEl.textContent = proposalState.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd);
     if (ctnEl) ctnEl.textContent = formatNumber(ctn, 2);
     if (cbmEl) cbmEl.textContent = formatNumber(cbmQty, 4);
     if (amtEl) amtEl.textContent = formatMoney(amount, proposalState.currency);
   });
 
-  const totalAmtEl = document.getElementById("total-amount");
-  const totalCtnEl = document.getElementById("total-ctn");
-  const totalCbmEl = document.getElementById("total-cbm");
-  if (totalAmtEl) totalAmtEl.textContent = formatMoney(totalAmount, proposalState.currency);
-  if (totalCtnEl) totalCtnEl.textContent = formatNumber(totalCtn, 2);
-  if (totalCbmEl) totalCbmEl.textContent = formatNumber(totalCbm, 4);
+  const totals = computeEstimateTotals(products);
+  const totalAmtEl = document.getElementById("est-total-amount");
+  const totalCtnEl = document.getElementById("est-total-ctn");
+  const totalCbmEl = document.getElementById("est-total-cbm");
+  if (totalAmtEl) totalAmtEl.textContent = formatMoney(totals.totalAmount, proposalState.currency);
+  if (totalCtnEl) totalCtnEl.textContent = formatNumber(totals.totalCtn, 2);
+  if (totalCbmEl) totalCbmEl.textContent = formatNumber(totals.totalCbm, 4);
 }
 
 function emptyPoRow() {
