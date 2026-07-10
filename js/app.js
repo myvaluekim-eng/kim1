@@ -873,7 +873,10 @@ function renderProposal() {
         <td>${p.category}</td>
         <td><strong>${p.nameKor}</strong></td>
         <td><code>${p.code}</code></td>
+        <td style="font-size:12px">${p.barcode || "—"}</td>
+        <td style="font-size:12px">${p.hsCode || "—"}</td>
         <td>${p.size}</td>
+        <td>${p.countryOrigin || "—"}</td>
         <td class="editable">
           <input class="input-cell srp" type="number" step="1" min="0"
             data-field="srpKrw" data-code="${p.code}"
@@ -884,6 +887,8 @@ function renderProposal() {
             data-field="srpUsd" data-code="${p.code}"
             value="${item.srpUsd ?? ""}" placeholder="미입력">
         </td>
+        <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
+        <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
         <td class="auto" data-fob-krw="${p.code}">${formatKrw(fobKrw)}</td>
         <td class="auto" data-fob-usd="${p.code}">${formatUsd(fobUsd)}</td>
         <td>${p.moq}</td>
@@ -980,9 +985,14 @@ function renderProposal() {
               <th>분류</th>
               <th>제품명</th>
               <th>제품코드</th>
+              <th>바코드</th>
+              <th>HS Code</th>
               <th>용량</th>
+              <th>원산지</th>
               <th class="col-editable">소비자가(₩)</th>
               <th class="col-editable">소비자가($)</th>
+              <th>MSRP(₩)</th>
+              <th>MAPP(₩)</th>
               <th class="col-auto">FOB(₩)</th>
               <th class="col-auto">FOB($)</th>
               <th>최소주문</th>
@@ -995,7 +1005,7 @@ function renderProposal() {
           <tbody>${rows}</tbody>
           <tfoot>
             <tr>
-              <td colspan="10" style="text-align:right;font-weight:700;padding:14px">합계</td>
+              <td colspan="15" style="text-align:right;font-weight:700;padding:14px">합계</td>
               <td class="total-row" id="total-ctn">${formatNumber(totalCtn, 2)}</td>
               <td class="total-row" id="total-cbm">${formatNumber(totalCbm, 4)}</td>
               <td class="total-row" id="total-amount">${formatMoney(totalAmount, channel)}</td>

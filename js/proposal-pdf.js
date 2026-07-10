@@ -24,6 +24,9 @@ function resolveProposalItemFields(item, proposal, channel) {
     category: item.category ?? product?.category ?? "",
     nameKor: item.nameKor ?? product?.nameKor ?? "",
     nameEng: item.nameEng ?? product?.nameEng ?? "",
+    barcode: item.barcode ?? product?.barcode ?? "",
+    hsCode: item.hsCode ?? product?.hsCode ?? "",
+    countryOrigin: item.countryOrigin ?? product?.countryOrigin ?? "",
     size: item.size ?? product?.size ?? "",
     moq: item.moq ?? product?.moq ?? "",
     cartonQty,
@@ -38,6 +41,8 @@ function resolveProposalItemFields(item, proposal, channel) {
     amount,
     srpKrw: item.srpKrw ?? item.srp ?? null,
     srpUsd: item.srpUsd ?? (channel?.currency === "USD" ? item.srp : null) ?? null,
+    msrpKrw: item.msrpKrw ?? product?.msrpKrw ?? null,
+    mappKrw: item.mappKrw ?? product?.mappKrw ?? null,
   };
 }
 
@@ -67,6 +72,9 @@ function buildProposalItemSnapshot(product, item, proposal, channel, fobUsd, fob
     nameKor: product.nameKor,
     nameEng: product.nameEng,
     category: product.category,
+    barcode: product.barcode,
+    hsCode: product.hsCode,
+    countryOrigin: product.countryOrigin,
     size: product.size,
     moq: product.moq,
     cartonQty: product.cartonQty,
@@ -74,6 +82,8 @@ function buildProposalItemSnapshot(product, item, proposal, channel, fobUsd, fob
     cbm: product.cbm,
     srpKrw: item.srpKrw,
     srpUsd: item.srpUsd,
+    msrpKrw: product.msrpKrw,
+    mappKrw: product.mappKrw,
     fobRate: proposal.fobRate,
     fobUsd,
     fobKrw,
@@ -96,9 +106,14 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
       <td>${item.category}</td>
       <td><strong>${item.nameKor}</strong>${item.nameEng ? `<br><span class="proposal-doc-sub">${item.nameEng}</span>` : ""}</td>
       <td><code>${item.productCode}</code></td>
+      <td>${item.barcode || "—"}</td>
+      <td>${item.hsCode || "—"}</td>
       <td>${item.size || "—"}</td>
+      <td>${item.countryOrigin || "—"}</td>
       <td class="text-right">${formatKrw(item.srpKrw)}</td>
       <td class="text-right">${formatUsd(item.srpUsd)}</td>
+      <td class="text-right">${item.msrpKrw != null ? formatKrw(item.msrpKrw) : "—"}</td>
+      <td class="text-right">${item.mappKrw != null ? formatKrw(item.mappKrw) : "—"}</td>
       <td class="text-right">${formatKrw(item.fobKrw)}</td>
       <td class="text-right">${formatUsd(item.fobUsd)}</td>
       <td class="text-center">${item.moq ?? "—"}</td>
@@ -118,9 +133,14 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
             <th>분류</th>
             <th>제품명</th>
             <th>제품코드</th>
+            <th>바코드</th>
+            <th>HS Code</th>
             <th>용량</th>
+            <th>원산지</th>
             <th>소비자가(₩)</th>
             <th>소비자가($)</th>
+            <th>MSRP(₩)</th>
+            <th>MAPP(₩)</th>
             <th>FOB(₩)</th>
             <th>FOB($)</th>
             <th>MOQ</th>
@@ -133,7 +153,7 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
         <tbody>${rows}</tbody>
         <tfoot>
           <tr>
-            <td colspan="10" class="text-right"><strong>합계</strong></td>
+            <td colspan="15" class="text-right"><strong>합계</strong></td>
             <td class="text-right total-row"><strong>${formatNumber(totals.totalCtn, 2)}</strong></td>
             <td class="text-right total-row"><strong>${formatNumber(totals.totalCbm, 4)}</strong></td>
             <td class="text-right total-row"><strong>${formatMoney(totals.totalAmount, channel)}</strong></td>
@@ -160,9 +180,14 @@ function buildProposalDocumentHtml(proposal) {
           ${item.nameEng ? `<div class="proposal-doc-sub">${item.nameEng}</div>` : ""}
         </td>
         <td>${item.productCode}</td>
+        <td>${item.barcode || "—"}</td>
+        <td>${item.hsCode || "—"}</td>
         <td>${item.size || "—"}</td>
+        <td>${item.countryOrigin || "—"}</td>
         <td class="num">${formatKrw(item.srpKrw)}</td>
         <td class="num">${formatUsd(item.srpUsd)}</td>
+        <td class="num">${item.msrpKrw != null ? formatKrw(item.msrpKrw) : "—"}</td>
+        <td class="num">${item.mappKrw != null ? formatKrw(item.mappKrw) : "—"}</td>
         <td class="num">${formatKrw(item.fobKrw)}</td>
         <td class="num">${formatUsd(item.fobUsd)}</td>
         <td class="num">${item.moq ?? "—"}</td>
@@ -181,7 +206,12 @@ function buildProposalDocumentHtml(proposal) {
           <col class="col-cat">
           <col class="col-product">
           <col class="col-code">
+          <col class="col-code">
+          <col class="col-code">
           <col class="col-size">
+          <col class="col-code">
+          <col class="col-num">
+          <col class="col-num">
           <col class="col-num">
           <col class="col-num">
           <col class="col-num">
@@ -194,7 +224,7 @@ function buildProposalDocumentHtml(proposal) {
         </colgroup>
         <tbody class="proposal-doc-sheet">
           <tr class="proposal-doc-head-title">
-            <td colspan="13">
+            <td colspan="18">
               <div class="proposal-doc-head-main">PRODUCT &amp; PRICE LIST</div>
               <div class="proposal-doc-head-subline">Barle Cosmetics</div>
             </td>
@@ -207,7 +237,7 @@ function buildProposalDocumentHtml(proposal) {
             <td class="meta-label">Market</td>
             <td colspan="2">${channel?.name || "—"}</td>
             <td class="meta-label">Ver.</td>
-            <td colspan="2">${proposal.version}</td>
+            <td colspan="7">${proposal.version}</td>
           </tr>
           <tr class="proposal-doc-meta-row">
             <td class="meta-label">FOB</td>
@@ -215,15 +245,20 @@ function buildProposalDocumentHtml(proposal) {
             <td class="meta-label">Exchange</td>
             <td colspan="3">1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")}</td>
             <td class="meta-label">Total</td>
-            <td colspan="5">${formatMoney(totals.totalAmount, channel)}</td>
+            <td colspan="10">${formatMoney(totals.totalAmount, channel)}</td>
           </tr>
           <tr class="proposal-doc-colhead">
             <td>Category</td>
             <td>Product</td>
             <td>Code</td>
+            <td>Barcode</td>
+            <td>HS Code</td>
             <td>Size</td>
+            <td>Origin</td>
             <td>SRP (₩)</td>
             <td>SRP ($)</td>
+            <td>MSRP (₩)</td>
+            <td>MAPP (₩)</td>
             <td>FOB (₩)</td>
             <td>FOB ($)</td>
             <td>MOQ</td>
@@ -234,7 +269,7 @@ function buildProposalDocumentHtml(proposal) {
           </tr>
           ${tableRows}
           <tr class="proposal-doc-total">
-            <td colspan="10" class="total-label">TOTAL</td>
+            <td colspan="15" class="total-label">TOTAL</td>
             <td class="num">${formatNumber(totals.totalCtn, 2)}</td>
             <td class="num">${formatNumber(totals.totalCbm, 4)}</td>
             <td class="num">${formatMoney(totals.totalAmount, channel)}</td>
