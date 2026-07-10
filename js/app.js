@@ -2029,13 +2029,17 @@ function renderProductForm(editProduct = null) {
       <form id="add-product-form" class="product-form">
         <div class="form-grid">
           <div class="form-group">
+            <label>카테고리 *</label>
+            <input type="text" name="category" placeholder="Serum" required value="${escapeAttr(p.category || "")}">
+          </div>
+          <div class="form-group">
             <label>제품코드 *</label>
             <input type="text" name="code" placeholder="Br-0015" required
               value="${escapeAttr(p.code || "")}" ${isEdit ? "readonly class=\"input-readonly\"" : ""}>
           </div>
           <div class="form-group">
-            <label>카테고리 *</label>
-            <input type="text" name="category" placeholder="Serum" required value="${escapeAttr(p.category || "")}">
+            <label>바코드</label>
+            <input type="text" name="barcode" placeholder="8800259230xxx" value="${escapeAttr(p.barcode || "")}">
           </div>
           <div class="form-group">
             <label>제품명 (KOR) *</label>
@@ -2044,10 +2048,6 @@ function renderProductForm(editProduct = null) {
           <div class="form-group">
             <label>제품명 (ENG) *</label>
             <input type="text" name="nameEng" placeholder="Barle ..." required value="${escapeAttr(p.nameEng || "")}">
-          </div>
-          <div class="form-group">
-            <label>바코드</label>
-            <input type="text" name="barcode" placeholder="8800259230xxx" value="${escapeAttr(p.barcode || "")}">
           </div>
           <div class="form-group">
             <label>HS Code</label>
@@ -2062,10 +2062,6 @@ function renderProductForm(editProduct = null) {
             <input type="number" name="shelfLife" value="${p.shelfLife ?? 24}" min="1">
           </div>
           <div class="form-group">
-            <label>원산지</label>
-            <input type="text" name="countryOrigin" placeholder="Rep.Korea" value="${escapeAttr(p.countryOrigin || "")}">
-          </div>
-          <div class="form-group">
             <label>기준 소비자가 (₩)</label>
             <input type="number" name="srpKrw" step="1" min="0" placeholder="39000"
               value="${p.srpKrw ?? ""}">
@@ -2076,12 +2072,8 @@ function renderProductForm(editProduct = null) {
               value="${p.srpUsd ?? ""}">
           </div>
           <div class="form-group">
-            <label>MSRP (₩)</label>
-            <input type="number" name="msrpKrw" step="1" min="0" placeholder="46800" value="${p.msrpKrw ?? ""}">
-          </div>
-          <div class="form-group">
-            <label>MAPP (₩)</label>
-            <input type="number" name="mappKrw" step="1" min="0" placeholder="39780" value="${p.mappKrw ?? ""}">
+            <label>공급가율 (%)</label>
+            <input type="number" name="fobRate" value="${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 : 29}" min="1" max="100" step="0.1">
           </div>
           <div class="form-group">
             <label>공급가 FOB (₩)</label>
@@ -2093,8 +2085,24 @@ function renderProductForm(editProduct = null) {
               value="${p.fobUsd ?? ""}">
           </div>
           <div class="form-group">
-            <label>공급가율 (%)</label>
-            <input type="number" name="fobRate" value="${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 : 29}" min="1" max="100" step="0.1">
+            <label>MSRP (₩)</label>
+            <input type="number" name="msrpKrw" step="1" min="0" placeholder="46800" value="${p.msrpKrw ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>MAPP (₩)</label>
+            <input type="number" name="mappKrw" step="1" min="0" placeholder="39780" value="${p.mappKrw ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>박스입수량 (PCS/CTN)</label>
+            <input type="number" name="cartonQty" value="${p.cartonQty ?? 50}" min="1">
+          </div>
+          <div class="form-group">
+            <label>MOQ (PCS)</label>
+            <input type="number" name="moqPcs" min="1" value="${p.moqPcs ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>MOQ (CTN)</label>
+            <input type="number" name="moq" value="${p.moq ?? 50}" min="1">
           </div>
           <div class="form-group">
             <label>개별 제품 사이즈 (W*L*H, cm)</label>
@@ -2103,10 +2111,6 @@ function renderProductForm(editProduct = null) {
           <div class="form-group">
             <label>개별 제품 중량 (kg)</label>
             <input type="number" name="productWeight" step="0.01" min="0" value="${p.productWeight ?? ""}">
-          </div>
-          <div class="form-group">
-            <label>박스입수량 (PCS/CTN)</label>
-            <input type="number" name="cartonQty" value="${p.cartonQty ?? 50}" min="1">
           </div>
           <div class="form-group">
             <label>카톤박스 사이즈 (W*L*H, cm)</label>
@@ -2121,14 +2125,6 @@ function renderProductForm(editProduct = null) {
             <input type="number" name="cbm" step="0.00001" value="${p.cbm ?? 0.02}" min="0">
           </div>
           <div class="form-group">
-            <label>MOQ (CTN)</label>
-            <input type="number" name="moq" value="${p.moq ?? 50}" min="1">
-          </div>
-          <div class="form-group">
-            <label>MOQ (PCS)</label>
-            <input type="number" name="moqPcs" min="1" value="${p.moqPcs ?? ""}">
-          </div>
-          <div class="form-group">
             <label>1팔레트 카톤수</label>
             <input type="number" name="palletCartons" min="0" value="${p.palletCartons ?? ""}">
           </div>
@@ -2139,6 +2135,10 @@ function renderProductForm(editProduct = null) {
           <div class="form-group">
             <label>1팔레트 중량 (kg)</label>
             <input type="number" name="palletWeight" step="0.1" min="0" value="${p.palletWeight ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>원산지</label>
+            <input type="text" name="countryOrigin" placeholder="Rep.Korea" value="${escapeAttr(p.countryOrigin || "")}">
           </div>
         </div>
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
@@ -2727,66 +2727,70 @@ function renderProducts() {
         <table>
           <thead>
             <tr>
+              <th>NO.</th>
               <th>카테고리</th>
               <th>제품코드</th>
+              <th>바코드</th>
               <th>제품명 (KOR)</th>
               <th>제품명 (ENG)</th>
-              <th>바코드</th>
               <th>HS Code</th>
-              <th>원산지</th>
               <th>용량</th>
               <th>유통기한</th>
               <th>기준가(₩)</th>
               <th>기준가($)</th>
-              <th>MSRP(₩)</th>
-              <th>MAPP(₩)</th>
+              <th>공급가율(%)</th>
               <th>FOB(₩)</th>
               <th>FOB($)</th>
+              <th>MSRP(₩)</th>
+              <th>MAPP(₩)</th>
               <th>박스입수량</th>
+              <th>MOQ(PCS)</th>
+              <th>MOQ(CTN)</th>
+              <th>제품사이즈</th>
+              <th>제품중량</th>
               <th>카톤사이즈</th>
               <th>카톤중량</th>
               <th>CBM</th>
-              <th>MOQ(CTN)</th>
-              <th>MOQ(PCS)</th>
-              <th>제품사이즈</th>
-              <th>제품중량</th>
               <th>팔레트(CTN)</th>
               <th>팔레트(PCS)</th>
               <th>팔레트중량</th>
+              <th>원산지</th>
               <th class="no-print"></th>
             </tr>
           </thead>
           <tbody>
             ${products
               .map(
-                (p) => `
+                (p, i) => `
               <tr class="${productEditCode === p.code ? "row-editing" : ""}">
+                <td>${i + 1}</td>
                 <td>${p.category}</td>
                 <td><code>${p.code}</code></td>
+                <td style="font-size:12px">${p.barcode || "—"}</td>
                 <td>${p.nameKor}</td>
                 <td style="font-size:12px;color:var(--text-muted)">${p.nameEng}</td>
-                <td style="font-size:12px">${p.barcode || "—"}</td>
                 <td style="font-size:12px">${p.hsCode || "—"}</td>
-                <td>${p.countryOrigin || "—"}</td>
                 <td>${p.size || "—"}</td>
                 <td>${p.shelfLife}개월</td>
                 <td>${p.srpKrw != null ? formatKrw(p.srpKrw) : "—"}</td>
                 <td>${p.srpUsd != null ? formatUsd(p.srpUsd) : "—"}</td>
-                <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
-                <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
+                <td>${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 + "%" : "—"}</td>
                 <td>${p.fobKrw != null ? formatKrw(p.fobKrw) : "—"}</td>
                 <td>${p.fobUsd != null ? formatUsd(p.fobUsd) : "—"}</td>
+                <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
+                <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
                 <td>${p.cartonQty}</td>
+                <td>${p.moqPcs ?? "—"}</td>
+                <td>${p.moq}</td>
+                <td style="font-size:12px">${p.productSize || "—"}</td>
+                <td>${p.productWeight ?? "—"}</td>
                 <td style="font-size:12px">${p.cartonSize || "—"}</td>
                 <td>${p.cartonWeight ?? "—"}</td>
                 <td>${p.cbm}</td>
-                <td>${p.moq}</td>
-                <td>${p.moqPcs ?? "—"}</td>
-                <td style="font-size:12px">${p.productSize || "—"}</td>
-                <td>${p.productWeight ?? "—"}</td>
                 <td>${p.palletCartons ?? "—"}</td>
                 <td>${p.palletPcs ?? "—"}</td>
                 <td>${p.palletWeight ?? "—"}</td>
+                <td>${p.countryOrigin || "—"}</td>
                 <td class="no-print">
                   <div style="display:flex;gap:6px;flex-wrap:wrap">
                     <button class="btn btn-secondary btn-sm" data-edit-product="${p.code}">수정</button>
