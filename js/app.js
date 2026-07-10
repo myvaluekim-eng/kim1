@@ -875,7 +875,6 @@ function renderProposal() {
           <strong>${p.nameKor}</strong>
           ${p.nameEng ? `<br><span style="font-size:12px;color:var(--text-muted)">${p.nameEng}</span>` : ""}
         </td>
-        <td><code>${p.code}</code></td>
         <td style="font-size:12px">${p.barcode || "—"}</td>
         <td style="font-size:12px">${p.hsCode || "—"}</td>
         <td>${p.size}</td>
@@ -987,7 +986,6 @@ function renderProposal() {
             <tr>
               <th>Category</th>
               <th>Product</th>
-              <th>Code</th>
               <th>Barcode</th>
               <th>HS Code</th>
               <th>Size</th>
@@ -1016,7 +1014,7 @@ function renderProposal() {
           <tbody>${rows}</tbody>
           <tfoot>
             <tr>
-              <td colspan="23" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
+              <td colspan="22" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
               <td class="total-row" id="total-ctn">${formatNumber(totalCtn, 2)}</td>
               <td class="total-row" id="total-cbm">${formatNumber(totalCbm, 4)}</td>
               <td class="total-row" id="total-amount">${formatMoney(totalAmount, channel)}</td>

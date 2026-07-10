@@ -123,7 +123,6 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
     <tr>
       <td>${item.category}</td>
       <td><strong>${item.nameKor}</strong>${item.nameEng ? `<br><span class="proposal-doc-sub">${item.nameEng}</span>` : ""}</td>
-      <td><code>${item.productCode}</code></td>
       <td>${item.barcode || "—"}</td>
       <td>${item.hsCode || "—"}</td>
       <td>${item.size || "—"}</td>
@@ -158,7 +157,6 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
           <tr>
             <th>Category</th>
             <th>Product</th>
-            <th>Code</th>
             <th>Barcode</th>
             <th>HS Code</th>
             <th>Size</th>
@@ -187,7 +185,7 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
         <tbody>${rows}</tbody>
         <tfoot>
           <tr>
-            <td colspan="23" class="text-right"><strong>TOTAL</strong></td>
+            <td colspan="22" class="text-right"><strong>TOTAL</strong></td>
             <td class="text-right total-row"><strong>${formatNumber(totals.totalCtn, 2)}</strong></td>
             <td class="text-right total-row"><strong>${formatNumber(totals.totalCbm, 4)}</strong></td>
             <td class="text-right total-row"><strong>${formatMoney(totals.totalAmount, channel)}</strong></td>
@@ -213,7 +211,6 @@ function buildProposalDocumentHtml(proposal) {
           <div class="proposal-doc-product">${item.nameKor}</div>
           ${item.nameEng ? `<div class="proposal-doc-sub">${item.nameEng}</div>` : ""}
         </td>
-        <td>${item.productCode}</td>
         <td>${item.barcode || "—"}</td>
         <td>${item.hsCode || "—"}</td>
         <td>${item.size || "—"}</td>
@@ -249,7 +246,6 @@ function buildProposalDocumentHtml(proposal) {
           <col class="col-product">
           <col class="col-code">
           <col class="col-code">
-          <col class="col-code">
           <col class="col-size">
           <col class="col-num">
           <col class="col-num">
@@ -274,7 +270,7 @@ function buildProposalDocumentHtml(proposal) {
         </colgroup>
         <tbody class="proposal-doc-sheet">
           <tr class="proposal-doc-head-title">
-            <td colspan="26">
+            <td colspan="25">
               <div class="proposal-doc-head-main">PRODUCT &amp; PRICE LIST</div>
               <div class="proposal-doc-head-subline">Barle Cosmetics</div>
             </td>
@@ -287,7 +283,7 @@ function buildProposalDocumentHtml(proposal) {
             <td class="meta-label">Market</td>
             <td colspan="2">${channel?.name || "—"}</td>
             <td class="meta-label">Ver.</td>
-            <td colspan="15">${proposal.version}</td>
+            <td colspan="14">${proposal.version}</td>
           </tr>
           <tr class="proposal-doc-meta-row">
             <td class="meta-label">FOB</td>
@@ -295,12 +291,11 @@ function buildProposalDocumentHtml(proposal) {
             <td class="meta-label">Exchange</td>
             <td colspan="3">1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")}</td>
             <td class="meta-label">Total</td>
-            <td colspan="18">${formatMoney(totals.totalAmount, channel)}</td>
+            <td colspan="17">${formatMoney(totals.totalAmount, channel)}</td>
           </tr>
           <tr class="proposal-doc-colhead">
             <td>Category</td>
             <td>Product</td>
-            <td>Code</td>
             <td>Barcode</td>
             <td>HS Code</td>
             <td>Size</td>
@@ -327,7 +322,7 @@ function buildProposalDocumentHtml(proposal) {
           </tr>
           ${tableRows}
           <tr class="proposal-doc-total">
-            <td colspan="23" class="total-label">TOTAL</td>
+            <td colspan="22" class="total-label">TOTAL</td>
             <td class="num">${formatNumber(totals.totalCtn, 2)}</td>
             <td class="num">${formatNumber(totals.totalCbm, 4)}</td>
             <td class="num">${formatMoney(totals.totalAmount, channel)}</td>
