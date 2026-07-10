@@ -106,6 +106,7 @@ let proposalState = {
   poDate: new Date().toISOString().slice(0, 10),
   fobRate: 29,
   exchangeRate: DEFAULT_EXCHANGE_RATE,
+  currency: "KRW",
   items: {},
 };
 
@@ -161,6 +162,7 @@ function initProposalState(channelId) {
   proposalState.channelId = channel.id;
   proposalState.fobRate = Math.round(channel.defaultFobRate * 100);
   proposalState.exchangeRate = appData.exchangeRate || DEFAULT_EXCHANGE_RATE;
+  proposalState.currency = "KRW";
   proposalState.items = {};
   getProducts(appData).forEach((p) => {
     proposalState.items[p.code] = {
@@ -205,8 +207,8 @@ function calcCbmQty(ctn, cbm) {
   return ctn * cbm;
 }
 
-function calcAmount(fobUsd, fobKrw, poQty, channel) {
-  if (channel.currency === "KRW") {
+function calcAmount(fobUsd, fobKrw, poQty, currency) {
+  if (currency === "KRW") {
     return (fobKrw ?? 0) * poQty;
   }
   return (fobUsd ?? 0) * poQty;
@@ -227,9 +229,9 @@ function formatUsd(value) {
   return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatMoney(value, channel) {
+function formatMoney(value, currency) {
   if (value == null) return "—";
-  if (channel.currency === "KRW") return formatKrw(value);
+  if (currency === "KRW") return formatKrw(value);
   return formatUsd(value);
 }
 
@@ -863,7 +865,7 @@ function renderProposal() {
     );
     const ctn = calcCtn(item.poQty, p.cartonQty);
     const cbmQty = calcCbmQty(ctn, p.cbm);
-    const amount = calcAmount(fobUsd, fobKrw, item.poQty, channel);
+    const amount = calcAmount(fobUsd, fobKrw, item.poQty, proposalState.currency);
     totalAmount += amount;
     totalCtn += ctn;
     totalCbm += cbmQty;
@@ -879,7 +881,7 @@ function renderProposal() {
         <td>${p.shelfLife ?? "—"}</td>
         <td>${p.srpKrw != null ? formatKrw(p.srpKrw) : "—"}</td>
         <td>${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 + "%" : "—"}</td>
-        <td class="auto" data-fob="${p.code}">${channel.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd)}</td>
+        <td class="auto" data-fob="${p.code}">${proposalState.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd)}</td>
         <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
         <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
         <td>${p.cartonQty ?? "—"}</td>
@@ -899,7 +901,7 @@ function renderProposal() {
         </td>
         <td class="auto" data-ctn="${p.code}">${formatNumber(ctn, 2)}</td>
         <td class="auto" data-cbm="${p.code}">${formatNumber(cbmQty, 4)}</td>
-        <td class="auto" data-amount="${p.code}">${formatMoney(amount, channel)}</td>
+        <td class="auto" data-amount="${p.code}">${formatMoney(amount, proposalState.currency)}</td>
       </tr>`;
   }).join("");
 
@@ -967,8 +969,15 @@ function renderProposal() {
           <label>환율 (1달러 = ?원)</label>
           <input type="number" id="exchange-rate" value="${proposalState.exchangeRate}" min="1" step="1">
         </div>
+        <div class="setting-item">
+          <label>표시 통화</label>
+          <select id="proposal-currency">
+            <option value="KRW" ${proposalState.currency === "KRW" ? "selected" : ""}>원화 (₩)</option>
+            <option value="USD" ${proposalState.currency === "USD" ? "selected" : ""}>달러 ($)</option>
+          </select>
+        </div>
         <p class="setting-hint">
-          소비자가 × FOB 비율 = FOB 가격 · 환율로 원화/달러 동시 계산
+          소비자가 × FOB 비율 = FOB 가격 · 환율로 원화/달러 동시 계산 · FOB·금액은 선택한 통화로 표시됩니다
         </p>
       </div>
     </div>
@@ -992,7 +1001,7 @@ function renderProposal() {
               <th>Shelf Life</th>
               <th>SRP (₩)</th>
               <th>FOB Rate (%)</th>
-              <th class="col-auto">FOB (${channel.currencySymbol})</th>
+              <th class="col-auto">FOB (${proposalState.currency === "KRW" ? "₩" : "$"})</th>
               <th>MSRP (₩)</th>
               <th>MAPP (₩)</th>
               <th>Ctn Qty</th>
@@ -1018,7 +1027,7 @@ function renderProposal() {
               <td colspan="24" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
               <td class="total-row" id="total-ctn">${formatNumber(totalCtn, 2)}</td>
               <td class="total-row" id="total-cbm">${formatNumber(totalCbm, 4)}</td>
-              <td class="total-row" id="total-amount">${formatMoney(totalAmount, channel)}</td>
+              <td class="total-row" id="total-amount">${formatMoney(totalAmount, proposalState.currency)}</td>
             </tr>
           </tfoot>
         </table>
@@ -1084,6 +1093,11 @@ function bindProposalEvents() {
     updateProposalCalcs(channel);
   });
 
+  document.getElementById("proposal-currency").addEventListener("change", (e) => {
+    proposalState.currency = e.target.value === "USD" ? "USD" : "KRW";
+    render();
+  });
+
   document.querySelectorAll("#proposal-table input").forEach((input) => {
     input.addEventListener("input", (e) => {
       const code = e.target.dataset.code;
@@ -1127,6 +1141,7 @@ function bindProposalEvents() {
       poDate: proposalState.poDate,
       fobRate: proposalState.fobRate,
       exchangeRate: proposalState.exchangeRate,
+      priceCurrency: proposalState.currency,
       items,
       totalAmount,
       terms,
@@ -1162,6 +1177,7 @@ function bindProposalEvents() {
         poDate: proposalState.poDate,
         fobRate: proposalState.fobRate,
         exchangeRate: proposalState.exchangeRate,
+        priceCurrency: proposalState.currency,
         version: "draft",
         items,
         totalAmount: items.reduce((s, i) => s + i.amount, 0),
@@ -1192,7 +1208,7 @@ function updateProposalCalcs(channel) {
     );
     const ctn = calcCtn(item.poQty, p.cartonQty);
     const cbmQty = calcCbmQty(ctn, p.cbm);
-    const amount = calcAmount(fobUsd, fobKrw, item.poQty, channel);
+    const amount = calcAmount(fobUsd, fobKrw, item.poQty, proposalState.currency);
     totalAmount += amount;
     totalCtn += ctn;
     totalCbm += cbmQty;
@@ -1201,16 +1217,16 @@ function updateProposalCalcs(channel) {
     const ctnEl = document.querySelector(`[data-ctn="${p.code}"]`);
     const cbmEl = document.querySelector(`[data-cbm="${p.code}"]`);
     const amtEl = document.querySelector(`[data-amount="${p.code}"]`);
-    if (fobEl) fobEl.textContent = channel.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd);
+    if (fobEl) fobEl.textContent = proposalState.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd);
     if (ctnEl) ctnEl.textContent = formatNumber(ctn, 2);
     if (cbmEl) cbmEl.textContent = formatNumber(cbmQty, 4);
-    if (amtEl) amtEl.textContent = formatMoney(amount, channel);
+    if (amtEl) amtEl.textContent = formatMoney(amount, proposalState.currency);
   });
 
   const totalAmtEl = document.getElementById("total-amount");
   const totalCtnEl = document.getElementById("total-ctn");
   const totalCbmEl = document.getElementById("total-cbm");
-  if (totalAmtEl) totalAmtEl.textContent = formatMoney(totalAmount, channel);
+  if (totalAmtEl) totalAmtEl.textContent = formatMoney(totalAmount, proposalState.currency);
   if (totalCtnEl) totalCtnEl.textContent = formatNumber(totalCtn, 2);
   if (totalCbmEl) totalCbmEl.textContent = formatNumber(totalCbm, 4);
 }
@@ -3316,7 +3332,7 @@ function renderHistory() {
               <span class="version">v${p.version}</span>
               <span>${p.clientName}</span>
               <span class="date">${p.poDate} · FOB ${p.fobRate}%</span>
-              <span class="date">Total: ${formatMoney(p.totalAmount, ch)}</span>
+              <span class="date">Total: ${formatMoney(p.totalAmount, getProposalCurrency(p, ch))}</span>
             </div>
             <div class="history-actions no-print">
               <button class="btn btn-secondary btn-sm" data-view-id="${p.id}">보기</button>

@@ -7,6 +7,8 @@ function exportProposalToExcel(proposal) {
   const ch = getChannels(appData).find((c) => c.id === proposal.channelId);
   const items = getProposalDisplayItems(proposal);
   const totals = getProposalDisplayTotals(items, ch);
+  const currency = getProposalCurrency(proposal, ch);
+  const currencySymbol = currency === "KRW" ? "₩" : "$";
 
   const rows = [
     ["PRODUCT & PRICE LIST"],
@@ -27,7 +29,7 @@ function exportProposalToExcel(proposal) {
       "Shelf Life",
       "SRP (₩)",
       "FOB Rate (%)",
-      `FOB (${ch.currencySymbol})`,
+      `FOB (${currencySymbol})`,
       "MSRP (₩)",
       "MAPP (₩)",
       "Ctn Qty",
@@ -59,7 +61,7 @@ function exportProposalToExcel(proposal) {
       item.shelfLife ?? "",
       item.srpKrw ?? "",
       item.productFobRate != null ? Math.round(item.productFobRate * 1000) / 10 : "",
-      (ch.currency === "KRW" ? item.fobKrw : item.fobUsd) ?? "",
+      (currency === "KRW" ? item.fobKrw : item.fobUsd) ?? "",
       item.msrpKrw ?? "",
       item.mappKrw ?? "",
       item.cartonQty ?? "",

@@ -6,6 +6,7 @@ function resolveProposalItemFields(item, proposal, channel) {
   const ctn = item.ctn != null ? item.ctn : calcCtn(poQty, cartonQty);
   const cbmQty = item.cbmQty != null ? item.cbmQty : calcCbmQty(ctn, cbmPerCtn);
   const fobRate = item.fobRate ?? proposal.fobRate;
+  const currency = getProposalCurrency(proposal, channel);
   let fobUsd = item.fobUsd;
   let fobKrw = item.fobKrw;
   if (fobUsd == null && fobKrw == null) {
@@ -18,7 +19,7 @@ function resolveProposalItemFields(item, proposal, channel) {
     fobUsd = calc.fobUsd;
     fobKrw = calc.fobKrw;
   }
-  const amount = item.amount ?? calcAmount(fobUsd, fobKrw, poQty, channel);
+  const amount = item.amount ?? calcAmount(fobUsd, fobKrw, poQty, currency);
   return {
     ...item,
     category: item.category ?? product?.category ?? "",
@@ -49,7 +50,7 @@ function resolveProposalItemFields(item, proposal, channel) {
     fobKrw,
     amount,
     srpKrw: item.srpKrw ?? item.srp ?? null,
-    srpUsd: item.srpUsd ?? (channel?.currency === "USD" ? item.srp : null) ?? null,
+    srpUsd: item.srpUsd ?? (currency === "USD" ? item.srp : null) ?? null,
     msrpKrw: item.msrpKrw ?? product?.msrpKrw ?? null,
     mappKrw: item.mappKrw ?? product?.mappKrw ?? null,
   };
@@ -108,7 +109,7 @@ function buildProposalItemSnapshot(product, item, proposal, channel, fobUsd, fob
     poQty,
     ctn,
     cbmQty,
-    amount: calcAmount(fobUsd, fobKrw, poQty, channel),
+    amount: calcAmount(fobUsd, fobKrw, poQty, proposal.currency),
   };
 }
 
@@ -116,6 +117,8 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
   const items = getProposalDisplayItems(proposal);
   const totals = getProposalDisplayTotals(items, channel);
   const compact = options.compact === true;
+  const currency = getProposalCurrency(proposal, channel);
+  const currencySymbol = currency === "KRW" ? "₩" : "$";
 
   const rows = items
     .map(
@@ -130,7 +133,7 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
       <td class="text-center">${item.shelfLife ?? "—"}</td>
       <td class="text-right">${formatKrw(item.srpKrw)}</td>
       <td class="text-center">${item.productFobRate != null ? Math.round(item.productFobRate * 1000) / 10 + "%" : "—"}</td>
-      <td class="text-right">${channel.currency === "KRW" ? formatKrw(item.fobKrw) : formatUsd(item.fobUsd)}</td>
+      <td class="text-right">${currency === "KRW" ? formatKrw(item.fobKrw) : formatUsd(item.fobUsd)}</td>
       <td class="text-right">${item.msrpKrw != null ? formatKrw(item.msrpKrw) : "—"}</td>
       <td class="text-right">${item.mappKrw != null ? formatKrw(item.mappKrw) : "—"}</td>
       <td class="text-center">${item.cartonQty ?? "—"}</td>
@@ -147,7 +150,7 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
       <td class="text-right">${item.poQty || 0}</td>
       <td class="text-right">${formatNumber(item.ctn, 2)}</td>
       <td class="text-right">${formatNumber(item.cbmQty, 4)}</td>
-      <td class="text-right amount-cell">${formatMoney(item.amount, channel)}</td>
+      <td class="text-right amount-cell">${formatMoney(item.amount, currency)}</td>
     </tr>`
     )
     .join("");
@@ -166,7 +169,7 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
             <th>Shelf Life</th>
             <th>SRP (₩)</th>
             <th>FOB Rate (%)</th>
-            <th>FOB (${channel.currencySymbol})</th>
+            <th>FOB (${currencySymbol})</th>
             <th>MSRP (₩)</th>
             <th>MAPP (₩)</th>
             <th>Ctn Qty</th>
@@ -192,7 +195,7 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
             <td colspan="24" class="text-right"><strong>TOTAL</strong></td>
             <td class="text-right total-row"><strong>${formatNumber(totals.totalCtn, 2)}</strong></td>
             <td class="text-right total-row"><strong>${formatNumber(totals.totalCbm, 4)}</strong></td>
-            <td class="text-right total-row"><strong>${formatMoney(totals.totalAmount, channel)}</strong></td>
+            <td class="text-right total-row"><strong>${formatMoney(totals.totalAmount, currency)}</strong></td>
           </tr>
         </tfoot>
       </table>
@@ -205,6 +208,8 @@ function buildProposalDocumentHtml(proposal) {
   const items = getProposalDisplayItems(proposal);
   const totals = getProposalDisplayTotals(items, channel);
   const terms = proposal.terms || [];
+  const currency = getProposalCurrency(proposal, channel);
+  const currencySymbol = currency === "KRW" ? "₩" : "$";
 
   const tableRows = items
     .map(
@@ -221,7 +226,7 @@ function buildProposalDocumentHtml(proposal) {
         <td class="num">${item.shelfLife ?? "—"}</td>
         <td class="num">${formatKrw(item.srpKrw)}</td>
         <td class="num">${item.productFobRate != null ? Math.round(item.productFobRate * 1000) / 10 + "%" : "—"}</td>
-        <td class="num">${channel.currency === "KRW" ? formatKrw(item.fobKrw) : formatUsd(item.fobUsd)}</td>
+        <td class="num">${currency === "KRW" ? formatKrw(item.fobKrw) : formatUsd(item.fobUsd)}</td>
         <td class="num">${item.msrpKrw != null ? formatKrw(item.msrpKrw) : "—"}</td>
         <td class="num">${item.mappKrw != null ? formatKrw(item.mappKrw) : "—"}</td>
         <td class="num">${item.cartonQty ?? "—"}</td>
@@ -238,7 +243,7 @@ function buildProposalDocumentHtml(proposal) {
         <td class="num">${item.poQty || 0}</td>
         <td class="num">${formatNumber(item.ctn, 2)}</td>
         <td class="num">${formatNumber(item.cbmQty, 4)}</td>
-        <td class="num">${formatMoney(item.amount, channel)}</td>
+        <td class="num">${formatMoney(item.amount, currency)}</td>
       </tr>`
     )
     .join("");
@@ -297,7 +302,7 @@ function buildProposalDocumentHtml(proposal) {
             <td class="meta-label">Exchange</td>
             <td colspan="3">1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")}</td>
             <td class="meta-label">Total</td>
-            <td colspan="18">${formatMoney(totals.totalAmount, channel)}</td>
+            <td colspan="18">${formatMoney(totals.totalAmount, currency)}</td>
           </tr>
           <tr class="proposal-doc-colhead">
             <td>Category</td>
@@ -308,7 +313,7 @@ function buildProposalDocumentHtml(proposal) {
             <td>Shelf Life</td>
             <td>SRP (₩)</td>
             <td>FOB Rate (%)</td>
-            <td>FOB (${channel.currencySymbol})</td>
+            <td>FOB (${currencySymbol})</td>
             <td>MSRP (₩)</td>
             <td>MAPP (₩)</td>
             <td>Ctn Qty</td>
@@ -332,7 +337,7 @@ function buildProposalDocumentHtml(proposal) {
             <td colspan="23" class="total-label">TOTAL</td>
             <td class="num">${formatNumber(totals.totalCtn, 2)}</td>
             <td class="num">${formatNumber(totals.totalCbm, 4)}</td>
-            <td class="num">${formatMoney(totals.totalAmount, channel)}</td>
+            <td class="num">${formatMoney(totals.totalAmount, currency)}</td>
           </tr>
         </tbody>
       </table>
