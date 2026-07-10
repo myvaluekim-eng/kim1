@@ -879,8 +879,7 @@ function renderProposal() {
         <td>${p.shelfLife ?? "—"}</td>
         <td>${p.srpKrw != null ? formatKrw(p.srpKrw) : "—"}</td>
         <td>${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 + "%" : "—"}</td>
-        <td class="auto" data-fob-krw="${p.code}">${formatKrw(fobKrw)}</td>
-        <td class="auto" data-fob-usd="${p.code}">${formatUsd(fobUsd)}</td>
+        <td class="auto" data-fob="${p.code}">${channel.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd)}</td>
         <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
         <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
         <td>${p.cartonQty ?? "—"}</td>
@@ -993,8 +992,7 @@ function renderProposal() {
               <th>Shelf Life</th>
               <th>SRP (₩)</th>
               <th>FOB Rate (%)</th>
-              <th class="col-auto">FOB (₩)</th>
-              <th class="col-auto">FOB ($)</th>
+              <th class="col-auto">FOB (${channel.currencySymbol})</th>
               <th>MSRP (₩)</th>
               <th>MAPP (₩)</th>
               <th>Ctn Qty</th>
@@ -1017,7 +1015,7 @@ function renderProposal() {
           <tbody>${rows}</tbody>
           <tfoot>
             <tr>
-              <td colspan="25" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
+              <td colspan="24" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
               <td class="total-row" id="total-ctn">${formatNumber(totalCtn, 2)}</td>
               <td class="total-row" id="total-cbm">${formatNumber(totalCbm, 4)}</td>
               <td class="total-row" id="total-amount">${formatMoney(totalAmount, channel)}</td>
@@ -1199,13 +1197,11 @@ function updateProposalCalcs(channel) {
     totalCtn += ctn;
     totalCbm += cbmQty;
 
-    const fobKrwEl = document.querySelector(`[data-fob-krw="${p.code}"]`);
-    const fobUsdEl = document.querySelector(`[data-fob-usd="${p.code}"]`);
+    const fobEl = document.querySelector(`[data-fob="${p.code}"]`);
     const ctnEl = document.querySelector(`[data-ctn="${p.code}"]`);
     const cbmEl = document.querySelector(`[data-cbm="${p.code}"]`);
     const amtEl = document.querySelector(`[data-amount="${p.code}"]`);
-    if (fobKrwEl) fobKrwEl.textContent = formatKrw(fobKrw);
-    if (fobUsdEl) fobUsdEl.textContent = formatUsd(fobUsd);
+    if (fobEl) fobEl.textContent = channel.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd);
     if (ctnEl) ctnEl.textContent = formatNumber(ctn, 2);
     if (cbmEl) cbmEl.textContent = formatNumber(cbmQty, 4);
     if (amtEl) amtEl.textContent = formatMoney(amount, channel);
