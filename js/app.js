@@ -871,12 +871,16 @@ function renderProposal() {
     return `
       <tr data-code="${p.code}">
         <td>${p.category}</td>
-        <td><strong>${p.nameKor}</strong></td>
+        <td>
+          <strong>${p.nameKor}</strong>
+          ${p.nameEng ? `<br><span style="font-size:12px;color:var(--text-muted)">${p.nameEng}</span>` : ""}
+        </td>
         <td><code>${p.code}</code></td>
         <td style="font-size:12px">${p.barcode || "—"}</td>
         <td style="font-size:12px">${p.hsCode || "—"}</td>
         <td>${p.size}</td>
         <td>${p.countryOrigin || "—"}</td>
+        <td>${p.shelfLife ?? "—"}</td>
         <td class="editable">
           <input class="input-cell srp" type="number" step="1" min="0"
             data-field="srpKrw" data-code="${p.code}"
@@ -889,9 +893,19 @@ function renderProposal() {
         </td>
         <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
         <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
+        <td>${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 + "%" : "—"}</td>
         <td class="auto" data-fob-krw="${p.code}">${formatKrw(fobKrw)}</td>
         <td class="auto" data-fob-usd="${p.code}">${formatUsd(fobUsd)}</td>
+        <td>${p.cartonQty ?? "—"}</td>
+        <td>${p.moqPcs ?? "—"}</td>
         <td>${p.moq}</td>
+        <td style="font-size:12px">${p.productSize || "—"}</td>
+        <td>${p.productWeight ?? "—"}</td>
+        <td style="font-size:12px">${p.cartonSize || "—"}</td>
+        <td>${p.cartonWeight ?? "—"}</td>
+        <td>${p.palletCartons ?? "—"}</td>
+        <td>${p.palletPcs ?? "—"}</td>
+        <td>${p.palletWeight ?? "—"}</td>
         <td class="editable">
           <input class="input-cell qty" type="number" step="1" min="0"
             data-field="poQty" data-code="${p.code}" value="${item.poQty || ""}" placeholder="0">
@@ -982,30 +996,41 @@ function renderProposal() {
         <table id="proposal-table">
           <thead>
             <tr>
-              <th>분류</th>
-              <th>제품명</th>
-              <th>제품코드</th>
-              <th>바코드</th>
+              <th>Category</th>
+              <th>Product</th>
+              <th>Code</th>
+              <th>Barcode</th>
               <th>HS Code</th>
-              <th>용량</th>
-              <th>원산지</th>
-              <th class="col-editable">소비자가(₩)</th>
-              <th class="col-editable">소비자가($)</th>
-              <th>MSRP(₩)</th>
-              <th>MAPP(₩)</th>
-              <th class="col-auto">FOB(₩)</th>
-              <th class="col-auto">FOB($)</th>
-              <th>최소주문</th>
-              <th class="col-editable">주문수량</th>
-              <th class="col-auto">박스수</th>
-              <th class="col-auto">부피(CBM)</th>
-              <th class="col-auto">금액</th>
+              <th>Size</th>
+              <th>Origin</th>
+              <th>Shelf Life</th>
+              <th class="col-editable">SRP (₩)</th>
+              <th class="col-editable">SRP ($)</th>
+              <th>MSRP (₩)</th>
+              <th>MAPP (₩)</th>
+              <th>FOB Rate (%)</th>
+              <th class="col-auto">FOB (₩)</th>
+              <th class="col-auto">FOB ($)</th>
+              <th>Ctn Qty</th>
+              <th>MOQ (PCS)</th>
+              <th>MOQ (CTN)</th>
+              <th>Product Size</th>
+              <th>Product Wt (kg)</th>
+              <th>Carton Size</th>
+              <th>Carton Wt (kg)</th>
+              <th>Pallet (CTN)</th>
+              <th>Pallet (PCS)</th>
+              <th>Pallet Wt (kg)</th>
+              <th class="col-editable">Order Qty</th>
+              <th class="col-auto">CTN</th>
+              <th class="col-auto">CBM</th>
+              <th class="col-auto">Amount</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
           <tfoot>
             <tr>
-              <td colspan="15" style="text-align:right;font-weight:700;padding:14px">합계</td>
+              <td colspan="26" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
               <td class="total-row" id="total-ctn">${formatNumber(totalCtn, 2)}</td>
               <td class="total-row" id="total-cbm">${formatNumber(totalCbm, 4)}</td>
               <td class="total-row" id="total-amount">${formatMoney(totalAmount, channel)}</td>

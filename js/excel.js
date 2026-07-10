@@ -10,31 +10,44 @@ function exportProposalToExcel(proposal) {
 
   const rows = [
     ["PRODUCT & PRICE LIST"],
-    ["판매국가", ch.name],
-    ["업체명", proposal.clientName],
-    ["작성일", proposal.poDate],
-    ["버전", `v${proposal.version}`],
-    ["FOB 비율 (%)", proposal.fobRate],
-    ["환율 (₩/USD)", proposal.exchangeRate || ""],
+    ["Market", ch.name],
+    ["Buyer", proposal.clientName],
+    ["Date", proposal.poDate],
+    ["Version", `v${proposal.version}`],
+    ["FOB Rate (%)", proposal.fobRate],
+    ["Exchange Rate (₩/USD)", proposal.exchangeRate || ""],
     [],
     [
-      "분류",
-      "제품명",
-      "영문명",
-      "제품코드",
-      "용량",
-      "소비자가(₩)",
-      "소비자가($)",
-      "FOB(%)",
-      "FOB(₩)",
-      "FOB($)",
-      "MOQ",
-      "주문수량",
-      "박스수",
-      "부피(CBM)",
-      "카톤입수",
-      "카톤규격",
-      "금액",
+      "Category",
+      "Product (KOR)",
+      "Product (ENG)",
+      "Code",
+      "Barcode",
+      "HS Code",
+      "Size",
+      "Origin",
+      "Shelf Life",
+      "SRP (₩)",
+      "SRP ($)",
+      "MSRP (₩)",
+      "MAPP (₩)",
+      "FOB Rate (%)",
+      "FOB (₩)",
+      "FOB ($)",
+      "Ctn Qty",
+      "MOQ (PCS)",
+      "MOQ (CTN)",
+      "Product Size",
+      "Product Wt (kg)",
+      "Carton Size",
+      "Carton Wt (kg)",
+      "Pallet (CTN)",
+      "Pallet (PCS)",
+      "Pallet Wt (kg)",
+      "Order Qty",
+      "CTN",
+      "CBM",
+      "Amount",
     ],
   ];
 
@@ -44,71 +57,53 @@ function exportProposalToExcel(proposal) {
       item.nameKor,
       item.nameEng || "",
       item.productCode,
+      item.barcode || "",
+      item.hsCode || "",
       item.size || "",
+      item.countryOrigin || "",
+      item.shelfLife ?? "",
       item.srpKrw ?? "",
       item.srpUsd ?? "",
-      item.fobRate ?? proposal.fobRate,
+      item.msrpKrw ?? "",
+      item.mappKrw ?? "",
+      item.productFobRate != null ? Math.round(item.productFobRate * 1000) / 10 : "",
       item.fobKrw ?? "",
       item.fobUsd ?? "",
+      item.cartonQty ?? "",
+      item.moqPcs ?? "",
       item.moq ?? "",
+      item.productSize || "",
+      item.productWeight ?? "",
+      item.cartonSize || "",
+      item.cartonWeight ?? "",
+      item.palletCartons ?? "",
+      item.palletPcs ?? "",
+      item.palletWeight ?? "",
       item.poQty ?? 0,
       item.ctn ?? "",
       item.cbmQty ?? "",
-      item.cartonQty ?? "",
-      item.cartonSize || "",
       item.amount ?? 0,
     ]);
   });
 
   rows.push([]);
-  rows.push([
-    "합계",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    totals.totalCtn,
-    totals.totalCbm,
-    "",
-    "",
-    totals.totalAmount,
-  ]);
+  const totalRow = new Array(30).fill("");
+  totalRow[0] = "TOTAL";
+  totalRow[27] = totals.totalCtn;
+  totalRow[28] = totals.totalCbm;
+  totalRow[29] = totals.totalAmount;
+  rows.push(totalRow);
   rows.push([]);
   rows.push(["Terms & Conditions"]);
   (proposal.terms || []).forEach((t) => rows.push([t]));
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = [
-    { wch: 12 },
-    { wch: 24 },
-    { wch: 28 },
-    { wch: 12 },
-    { wch: 14 },
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 8 },
-    { wch: 12 },
-    { wch: 10 },
-    { wch: 8 },
-    { wch: 10 },
-    { wch: 10 },
-    { wch: 12 },
-    { wch: 10 },
-    { wch: 16 },
-    { wch: 14 },
-  ];
+  ws["!cols"] = new Array(30).fill({ wch: 12 });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, ch.name.slice(0, 31));
   const safeName = proposal.clientName.replace(/[/\\?%*:|"<>]/g, "_");
-  const filename = `단가표_${safeName}_v${proposal.version}_${proposal.poDate}.xlsx`;
+  const filename = `PriceList_${safeName}_v${proposal.version}_${proposal.poDate}.xlsx`;
   XLSX.writeFile(wb, filename);
 }
 

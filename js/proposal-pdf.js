@@ -28,9 +28,18 @@ function resolveProposalItemFields(item, proposal, channel) {
     hsCode: item.hsCode ?? product?.hsCode ?? "",
     countryOrigin: item.countryOrigin ?? product?.countryOrigin ?? "",
     size: item.size ?? product?.size ?? "",
+    shelfLife: item.shelfLife ?? product?.shelfLife ?? null,
     moq: item.moq ?? product?.moq ?? "",
+    moqPcs: item.moqPcs ?? product?.moqPcs ?? null,
     cartonQty,
     cartonSize: item.cartonSize ?? product?.cartonSize ?? "",
+    cartonWeight: item.cartonWeight ?? product?.cartonWeight ?? null,
+    productSize: item.productSize ?? product?.productSize ?? "",
+    productWeight: item.productWeight ?? product?.productWeight ?? null,
+    palletCartons: item.palletCartons ?? product?.palletCartons ?? null,
+    palletPcs: item.palletPcs ?? product?.palletPcs ?? null,
+    palletWeight: item.palletWeight ?? product?.palletWeight ?? null,
+    productFobRate: item.productFobRate ?? product?.fobRate ?? null,
     cbm: cbmPerCtn,
     poQty,
     ctn,
@@ -76,9 +85,18 @@ function buildProposalItemSnapshot(product, item, proposal, channel, fobUsd, fob
     hsCode: product.hsCode,
     countryOrigin: product.countryOrigin,
     size: product.size,
+    shelfLife: product.shelfLife,
     moq: product.moq,
+    moqPcs: product.moqPcs,
     cartonQty: product.cartonQty,
     cartonSize: product.cartonSize,
+    cartonWeight: product.cartonWeight,
+    productSize: product.productSize,
+    productWeight: product.productWeight,
+    palletCartons: product.palletCartons,
+    palletPcs: product.palletPcs,
+    palletWeight: product.palletWeight,
+    productFobRate: product.fobRate,
     cbm: product.cbm,
     srpKrw: item.srpKrw,
     srpUsd: item.srpUsd,
@@ -110,13 +128,24 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
       <td>${item.hsCode || "—"}</td>
       <td>${item.size || "—"}</td>
       <td>${item.countryOrigin || "—"}</td>
+      <td class="text-center">${item.shelfLife ?? "—"}</td>
       <td class="text-right">${formatKrw(item.srpKrw)}</td>
       <td class="text-right">${formatUsd(item.srpUsd)}</td>
       <td class="text-right">${item.msrpKrw != null ? formatKrw(item.msrpKrw) : "—"}</td>
       <td class="text-right">${item.mappKrw != null ? formatKrw(item.mappKrw) : "—"}</td>
+      <td class="text-center">${item.productFobRate != null ? Math.round(item.productFobRate * 1000) / 10 + "%" : "—"}</td>
       <td class="text-right">${formatKrw(item.fobKrw)}</td>
       <td class="text-right">${formatUsd(item.fobUsd)}</td>
+      <td class="text-center">${item.cartonQty ?? "—"}</td>
+      <td class="text-center">${item.moqPcs ?? "—"}</td>
       <td class="text-center">${item.moq ?? "—"}</td>
+      <td>${item.productSize || "—"}</td>
+      <td class="text-center">${item.productWeight ?? "—"}</td>
+      <td>${item.cartonSize || "—"}</td>
+      <td class="text-center">${item.cartonWeight ?? "—"}</td>
+      <td class="text-center">${item.palletCartons ?? "—"}</td>
+      <td class="text-center">${item.palletPcs ?? "—"}</td>
+      <td class="text-center">${item.palletWeight ?? "—"}</td>
       <td class="text-right">${item.poQty || 0}</td>
       <td class="text-right">${formatNumber(item.ctn, 2)}</td>
       <td class="text-right">${formatNumber(item.cbmQty, 4)}</td>
@@ -130,30 +159,41 @@ function renderProposalDetailTableHtml(proposal, channel, options = {}) {
       <table class="proposal-detail-table">
         <thead>
           <tr>
-            <th>분류</th>
-            <th>제품명</th>
-            <th>제품코드</th>
-            <th>바코드</th>
+            <th>Category</th>
+            <th>Product</th>
+            <th>Code</th>
+            <th>Barcode</th>
             <th>HS Code</th>
-            <th>용량</th>
-            <th>원산지</th>
-            <th>소비자가(₩)</th>
-            <th>소비자가($)</th>
-            <th>MSRP(₩)</th>
-            <th>MAPP(₩)</th>
-            <th>FOB(₩)</th>
-            <th>FOB($)</th>
-            <th>MOQ</th>
-            <th>주문수량</th>
-            <th>박스수</th>
-            <th>부피(CBM)</th>
-            <th>금액</th>
+            <th>Size</th>
+            <th>Origin</th>
+            <th>Shelf Life</th>
+            <th>SRP (₩)</th>
+            <th>SRP ($)</th>
+            <th>MSRP (₩)</th>
+            <th>MAPP (₩)</th>
+            <th>FOB Rate (%)</th>
+            <th>FOB (₩)</th>
+            <th>FOB ($)</th>
+            <th>Ctn Qty</th>
+            <th>MOQ (PCS)</th>
+            <th>MOQ (CTN)</th>
+            <th>Product Size</th>
+            <th>Product Wt (kg)</th>
+            <th>Carton Size</th>
+            <th>Carton Wt (kg)</th>
+            <th>Pallet (CTN)</th>
+            <th>Pallet (PCS)</th>
+            <th>Pallet Wt (kg)</th>
+            <th>Order Qty</th>
+            <th>CTN</th>
+            <th>CBM</th>
+            <th>Amount</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
           <tr>
-            <td colspan="15" class="text-right"><strong>합계</strong></td>
+            <td colspan="26" class="text-right"><strong>TOTAL</strong></td>
             <td class="text-right total-row"><strong>${formatNumber(totals.totalCtn, 2)}</strong></td>
             <td class="text-right total-row"><strong>${formatNumber(totals.totalCbm, 4)}</strong></td>
             <td class="text-right total-row"><strong>${formatMoney(totals.totalAmount, channel)}</strong></td>
@@ -184,13 +224,24 @@ function buildProposalDocumentHtml(proposal) {
         <td>${item.hsCode || "—"}</td>
         <td>${item.size || "—"}</td>
         <td>${item.countryOrigin || "—"}</td>
+        <td class="num">${item.shelfLife ?? "—"}</td>
         <td class="num">${formatKrw(item.srpKrw)}</td>
         <td class="num">${formatUsd(item.srpUsd)}</td>
         <td class="num">${item.msrpKrw != null ? formatKrw(item.msrpKrw) : "—"}</td>
         <td class="num">${item.mappKrw != null ? formatKrw(item.mappKrw) : "—"}</td>
+        <td class="num">${item.productFobRate != null ? Math.round(item.productFobRate * 1000) / 10 + "%" : "—"}</td>
         <td class="num">${formatKrw(item.fobKrw)}</td>
         <td class="num">${formatUsd(item.fobUsd)}</td>
+        <td class="num">${item.cartonQty ?? "—"}</td>
+        <td class="num">${item.moqPcs ?? "—"}</td>
         <td class="num">${item.moq ?? "—"}</td>
+        <td>${item.productSize || "—"}</td>
+        <td class="num">${item.productWeight ?? "—"}</td>
+        <td>${item.cartonSize || "—"}</td>
+        <td class="num">${item.cartonWeight ?? "—"}</td>
+        <td class="num">${item.palletCartons ?? "—"}</td>
+        <td class="num">${item.palletPcs ?? "—"}</td>
+        <td class="num">${item.palletWeight ?? "—"}</td>
         <td class="num">${item.poQty || 0}</td>
         <td class="num">${formatNumber(item.ctn, 2)}</td>
         <td class="num">${formatNumber(item.cbmQty, 4)}</td>
@@ -216,7 +267,18 @@ function buildProposalDocumentHtml(proposal) {
           <col class="col-num">
           <col class="col-num">
           <col class="col-num">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-num">
           <col class="col-moq">
+          <col class="col-moq">
+          <col class="col-size">
+          <col class="col-num">
+          <col class="col-size">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-num">
           <col class="col-qty">
           <col class="col-num">
           <col class="col-num">
@@ -224,7 +286,7 @@ function buildProposalDocumentHtml(proposal) {
         </colgroup>
         <tbody class="proposal-doc-sheet">
           <tr class="proposal-doc-head-title">
-            <td colspan="18">
+            <td colspan="29">
               <div class="proposal-doc-head-main">PRODUCT &amp; PRICE LIST</div>
               <div class="proposal-doc-head-subline">Barle Cosmetics</div>
             </td>
@@ -237,7 +299,7 @@ function buildProposalDocumentHtml(proposal) {
             <td class="meta-label">Market</td>
             <td colspan="2">${channel?.name || "—"}</td>
             <td class="meta-label">Ver.</td>
-            <td colspan="7">${proposal.version}</td>
+            <td colspan="18">${proposal.version}</td>
           </tr>
           <tr class="proposal-doc-meta-row">
             <td class="meta-label">FOB</td>
@@ -245,7 +307,7 @@ function buildProposalDocumentHtml(proposal) {
             <td class="meta-label">Exchange</td>
             <td colspan="3">1 USD = ₩${(proposal.exchangeRate || DEFAULT_EXCHANGE_RATE).toLocaleString("ko-KR")}</td>
             <td class="meta-label">Total</td>
-            <td colspan="10">${formatMoney(totals.totalAmount, channel)}</td>
+            <td colspan="21">${formatMoney(totals.totalAmount, channel)}</td>
           </tr>
           <tr class="proposal-doc-colhead">
             <td>Category</td>
@@ -255,13 +317,24 @@ function buildProposalDocumentHtml(proposal) {
             <td>HS Code</td>
             <td>Size</td>
             <td>Origin</td>
+            <td>Shelf Life</td>
             <td>SRP (₩)</td>
             <td>SRP ($)</td>
             <td>MSRP (₩)</td>
             <td>MAPP (₩)</td>
+            <td>FOB Rate (%)</td>
             <td>FOB (₩)</td>
             <td>FOB ($)</td>
-            <td>MOQ</td>
+            <td>Ctn Qty</td>
+            <td>MOQ (PCS)</td>
+            <td>MOQ (CTN)</td>
+            <td>Product Size</td>
+            <td>Product Wt (kg)</td>
+            <td>Carton Size</td>
+            <td>Carton Wt (kg)</td>
+            <td>Pallet (CTN)</td>
+            <td>Pallet (PCS)</td>
+            <td>Pallet Wt (kg)</td>
             <td>Qty</td>
             <td>CTN</td>
             <td>CBM</td>
@@ -269,7 +342,7 @@ function buildProposalDocumentHtml(proposal) {
           </tr>
           ${tableRows}
           <tr class="proposal-doc-total">
-            <td colspan="15" class="total-label">TOTAL</td>
+            <td colspan="26" class="total-label">TOTAL</td>
             <td class="num">${formatNumber(totals.totalCtn, 2)}</td>
             <td class="num">${formatNumber(totals.totalCbm, 4)}</td>
             <td class="num">${formatMoney(totals.totalAmount, channel)}</td>
