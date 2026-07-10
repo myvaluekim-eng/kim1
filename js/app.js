@@ -879,18 +879,7 @@ function renderProposal() {
         <td style="font-size:12px">${p.barcode || "—"}</td>
         <td style="font-size:12px">${p.hsCode || "—"}</td>
         <td>${p.size}</td>
-        <td>${p.countryOrigin || "—"}</td>
         <td>${p.shelfLife ?? "—"}</td>
-        <td class="editable">
-          <input class="input-cell srp" type="number" step="1" min="0"
-            data-field="srpKrw" data-code="${p.code}"
-            value="${item.srpKrw ?? ""}" placeholder="미입력">
-        </td>
-        <td class="editable">
-          <input class="input-cell srp" type="number" step="0.01" min="0"
-            data-field="srpUsd" data-code="${p.code}"
-            value="${item.srpUsd ?? ""}" placeholder="미입력">
-        </td>
         <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
         <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
         <td>${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 + "%" : "—"}</td>
@@ -1002,10 +991,7 @@ function renderProposal() {
               <th>Barcode</th>
               <th>HS Code</th>
               <th>Size</th>
-              <th>Origin</th>
               <th>Shelf Life</th>
-              <th class="col-editable">SRP (₩)</th>
-              <th class="col-editable">SRP ($)</th>
               <th>MSRP (₩)</th>
               <th>MAPP (₩)</th>
               <th>FOB Rate (%)</th>
@@ -1030,7 +1016,7 @@ function renderProposal() {
           <tbody>${rows}</tbody>
           <tfoot>
             <tr>
-              <td colspan="26" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
+              <td colspan="23" style="text-align:right;font-weight:700;padding:14px">TOTAL</td>
               <td class="total-row" id="total-ctn">${formatNumber(totalCtn, 2)}</td>
               <td class="total-row" id="total-cbm">${formatNumber(totalCbm, 4)}</td>
               <td class="total-row" id="total-amount">${formatMoney(totalAmount, channel)}</td>

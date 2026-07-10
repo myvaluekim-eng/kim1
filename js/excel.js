@@ -25,10 +25,7 @@ function exportProposalToExcel(proposal) {
       "Barcode",
       "HS Code",
       "Size",
-      "Origin",
       "Shelf Life",
-      "SRP (₩)",
-      "SRP ($)",
       "MSRP (₩)",
       "MAPP (₩)",
       "FOB Rate (%)",
@@ -60,10 +57,7 @@ function exportProposalToExcel(proposal) {
       item.barcode || "",
       item.hsCode || "",
       item.size || "",
-      item.countryOrigin || "",
       item.shelfLife ?? "",
-      item.srpKrw ?? "",
-      item.srpUsd ?? "",
       item.msrpKrw ?? "",
       item.mappKrw ?? "",
       item.productFobRate != null ? Math.round(item.productFobRate * 1000) / 10 : "",
@@ -87,18 +81,18 @@ function exportProposalToExcel(proposal) {
   });
 
   rows.push([]);
-  const totalRow = new Array(30).fill("");
+  const totalRow = new Array(27).fill("");
   totalRow[0] = "TOTAL";
-  totalRow[27] = totals.totalCtn;
-  totalRow[28] = totals.totalCbm;
-  totalRow[29] = totals.totalAmount;
+  totalRow[24] = totals.totalCtn;
+  totalRow[25] = totals.totalCbm;
+  totalRow[26] = totals.totalAmount;
   rows.push(totalRow);
   rows.push([]);
   rows.push(["Terms & Conditions"]);
   (proposal.terms || []).forEach((t) => rows.push([t]));
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = new Array(30).fill({ wch: 12 });
+  ws["!cols"] = new Array(27).fill({ wch: 12 });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, ch.name.slice(0, 31));
