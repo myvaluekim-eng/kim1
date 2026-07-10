@@ -118,6 +118,7 @@ function freshProductUploadState() {
     statusMsg: "",
     warning: "",
     rows: [],
+    applySrpToChannels: true,
   };
 }
 
@@ -2090,19 +2091,20 @@ function renderProductForm(editProduct = null) {
 const PRODUCT_IMPORT_HEADERS = [
   { key: "code", test: /제품코드|품번코드|^code$/i },
   { key: "category", test: /카테고리|분류|^category$/i },
-  { key: "nameKor", test: /국문|한글|^namekor$|^name$/i },
-  { key: "nameEng", test: /영문|^nameeng$/i },
+  { key: "nameKor", test: /국문|한글|^namekor$|^name$|\(kor\)/i },
+  { key: "nameEng", test: /영문|^nameeng$|^productname$/i },
   { key: "barcode", test: /바코드|^barcode$/i },
-  { key: "size", test: /용량|^size$/i },
-  { key: "cartonQty", test: /박스입수|카톤수량|^cartonqty$/i },
-  { key: "cartonSize", test: /카톤.*사이즈|박스.*사이즈|^cartonsize$/i },
+  { key: "size", test: /용량|^size$|packing|capacity/i },
+  { key: "cartonQty", test: /박스입수|카톤수량|^cartonqty$|1ct.*pcs/i },
+  { key: "cartonSize", test: /카톤.*사이즈|박스.*사이즈|^cartonsize$|1ct.*size/i },
   { key: "cbm", test: /^cbm$/i },
-  { key: "shelfLife", test: /유통기한|^shelflife$/i },
-  { key: "srpKrw", test: /소비자가.*원|기준가.*원|^srpkrw$/i },
+  { key: "shelfLife", test: /유통기한|shelflife/i },
+  { key: "srpKrw", test: /소비자가.*원|기준가.*원|^srpkrw$|retailprice/i },
   { key: "srpUsd", test: /소비자가.*\$|기준가.*\$|^srpusd$/i },
   { key: "fobUsd", test: /fob.*\$|^fobusd$/i },
-  { key: "fobRate", test: /fob.*(율|rate)|^fobrate$/i },
-  { key: "moq", test: /^moq$/i },
+  { key: "fobKrw", test: /fob.*\(?krw\)?|fob.*원/i },
+  { key: "fobRate", test: /fob.*(율|rate)|^fobrate$|fob.*%/i },
+  { key: "moq", test: /^moq$|moq.*ctn/i },
 ];
 
 function productImportNumber(text) {
@@ -2113,54 +2115,117 @@ function productImportNumber(text) {
 
 function parseProductMatrix(matrix) {
   const compact = (v) => String(v || "").replace(/\s/g, "");
-  let headerRowIdx = -1;
-  let colMap = {};
 
-  for (let i = 0; i < Math.min(matrix.length, 20); i++) {
+  // 헤더가 두 줄에 걸쳐 나뉘어 있는 공급처 스펙시트도 있어서(예: 1번째 줄에
+  // 품목명/카테고리, 2번째 줄에 국문 품명·박스입수 등), 최대 3줄을 묶어서
+  // 헤더 열을 인식한다.
+  const findHeaderInRow = (row) => {
     const found = {};
-    (matrix[i] || []).forEach((cell, idx) => {
-      const text = compact(cell);
+    const unitHints = {};
+    (row || []).forEach((cell, idx) => {
+      const raw = String(cell || "");
+      const text = compact(raw);
       if (!text) return;
       for (const def of PRODUCT_IMPORT_HEADERS) {
         if (def.test.test(text) && found[def.key] == null) {
           found[def.key] = idx;
+          if (/mm/i.test(raw)) unitHints[def.key] = "mm";
           break;
         }
       }
     });
-    if (found.code != null && found.nameKor != null && Object.keys(found).length > Object.keys(colMap).length) {
-      headerRowIdx = i;
-      colMap = found;
+    return { found, unitHints };
+  };
+
+  let headerRowIdx = -1;
+  let headerSpan = 1;
+  let colMap = {};
+  let unitHints = {};
+
+  for (let i = 0; i < Math.min(matrix.length, 20); i++) {
+    let merged = {};
+    let mergedUnits = {};
+    let span = 1;
+    for (let span2 = 1; span2 <= 3 && i + span2 - 1 < matrix.length; span2++) {
+      const { found, unitHints: hints } = findHeaderInRow(matrix[i + span2 - 1]);
+      merged = { ...found, ...merged }; // 먼저 찾은(윗줄) 열이 우선
+      mergedUnits = { ...hints, ...mergedUnits };
+      span = span2;
+      const hasKey = merged.code != null || merged.barcode != null;
+      const count = Object.keys(merged).length;
+      if (hasKey && count > Object.keys(colMap).length) {
+        headerRowIdx = i;
+        headerSpan = span;
+        colMap = merged;
+        unitHints = mergedUnits;
+      }
     }
   }
 
   if (headerRowIdx === -1) {
-    return { rows: [], warning: "제품코드·제품명 열을 찾지 못했습니다. 표 형식을 확인해주세요." };
+    return { rows: [], warning: "제품코드·바코드 열을 찾지 못했습니다. 표 형식을 확인해주세요." };
   }
 
+  const mmToCm = (text) => {
+    const nums = String(text || "")
+      .split(/[x*×]/i)
+      .map((s) => parseFloat(s.replace(/[^0-9.\-]/g, "")))
+      .filter((n) => !isNaN(n));
+    if (nums.length < 3) return { text, cbm: undefined };
+    const cm = nums.map((n) => n / 10);
+    return { text: cm.map((n) => Number(n.toFixed(2))).join("*"), cbm: (cm[0] * cm[1] * cm[2]) / 1000000 };
+  };
+
+  const cmToCbm = (text) => {
+    const nums = String(text || "")
+      .split(/[x*×]/i)
+      .map((s) => parseFloat(s.replace(/[^0-9.\-]/g, "")))
+      .filter((n) => !isNaN(n));
+    if (nums.length < 3) return undefined;
+    return (nums[0] * nums[1] * nums[2]) / 1000000;
+  };
+
   const rows = [];
-  for (let r = headerRowIdx + 1; r < matrix.length; r++) {
+  for (let r = headerRowIdx + headerSpan; r < matrix.length; r++) {
     const row = matrix[r] || [];
-    const cell = (key) => (colMap[key] != null ? String(row[colMap[key]] ?? "").trim() : "");
-    const code = cell("code");
-    const nameKor = cell("nameKor");
-    if (!code && !nameKor) continue;
+    // colMap에 있는(=파일에 실제로 있던) 열만 값을 채우고, 없는 열은 undefined로
+    // 남겨서 기존 제품 업데이트 시 다른 필드를 덮어쓰지 않게 한다.
+    const cell = (key) => (colMap[key] != null ? String(row[colMap[key]] ?? "").trim() : undefined);
+    const code = cell("code") || "";
+    const barcode = cell("barcode") || "";
+    if (!code && !barcode) continue;
+
+    const num = (key) => {
+      const v = cell(key);
+      return v ? productImportNumber(v) : undefined;
+    };
+    const fobRateRaw = cell("fobRate");
+
+    let cartonSize = cell("cartonSize");
+    let cbm = num("cbm");
+    if (cartonSize) {
+      const converted = unitHints.cartonSize === "mm" ? mmToCm(cartonSize) : { text: cartonSize, cbm: cmToCbm(cartonSize) };
+      cartonSize = converted.text;
+      if (cbm == null) cbm = converted.cbm;
+    }
+
     rows.push({
       code,
-      category: cell("category") || "기타",
-      nameKor,
+      category: cell("category"),
+      nameKor: cell("nameKor"),
       nameEng: cell("nameEng"),
-      barcode: cell("barcode"),
+      barcode,
       size: cell("size"),
-      cartonQty: productImportNumber(cell("cartonQty")) || 50,
-      cartonSize: cell("cartonSize"),
-      cbm: productImportNumber(cell("cbm")) || 0,
-      shelfLife: productImportNumber(cell("shelfLife")) || 24,
-      srpKrw: productImportNumber(cell("srpKrw")),
-      srpUsd: productImportNumber(cell("srpUsd")),
-      fobUsd: productImportNumber(cell("fobUsd")),
-      fobRate: cell("fobRate") ? productImportNumber(cell("fobRate")) / 100 : null,
-      moq: productImportNumber(cell("moq")) || 50,
+      cartonQty: num("cartonQty"),
+      cartonSize,
+      cbm,
+      shelfLife: num("shelfLife"),
+      srpKrw: num("srpKrw"),
+      srpUsd: num("srpUsd"),
+      fobUsd: num("fobUsd"),
+      fobKrw: num("fobKrw"),
+      fobRate: fobRateRaw ? productImportNumber(fobRateRaw) / 100 : undefined,
+      moq: num("moq"),
     });
   }
 
@@ -2203,7 +2268,13 @@ function handleProductFile(file) {
 
   parseProductExcelFile(file)
     .then((parsed) => {
-      productUploadState.rows = parsed.rows;
+      const exchangeRate = appData.exchangeRate || DEFAULT_EXCHANGE_RATE;
+      productUploadState.rows = parsed.rows.map((r) => ({
+        ...r,
+        // FOB($) 열이 따로 없고 FOB(원화)만 있으면 현재 환율로 환산해 미리 채워둔다.
+        // (등록 전 표에서 값을 확인·수정할 수 있음)
+        fobUsd: r.fobUsd ?? (r.fobKrw != null ? Math.round((r.fobKrw / exchangeRate) * 10000) / 10000 : undefined),
+      }));
       productUploadState.warning = parsed.warning || "";
       productUploadState.status = "done";
       render();
@@ -2215,19 +2286,50 @@ function handleProductFile(file) {
     });
 }
 
+function findExistingProductForImportRow(r) {
+  const products = getProducts(appData);
+  const code = r.code?.trim();
+  if (code) {
+    const byCode = products.find((p) => p.code === code);
+    if (byCode) return byCode;
+  }
+  const barcode = r.barcode?.trim();
+  if (barcode) {
+    const digits = barcode.replace(/\D/g, "");
+    if (digits) return products.find((p) => p.barcode && p.barcode.replace(/\D/g, "") === digits) || null;
+  }
+  return null;
+}
+
+function generateNextProductCode(existingCodes) {
+  let maxNum = 0;
+  existingCodes.forEach((c) => {
+    const m = String(c).match(/^Br-(\d+)/i);
+    if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+  });
+  return `Br-${String(maxNum + 1).padStart(4, "0")}`;
+}
+
 function renderProductImportRow(r, i) {
-  const isDuplicate = getProducts(appData).some((p) => p.code === r.code);
+  const isExisting = !!findExistingProductForImportRow(r);
+  const willSkip = !isExisting && !r.nameKor?.trim();
+  const statusBadge = isExisting
+    ? `<span class="badge badge-default">기존 · 업데이트</span>`
+    : willSkip
+    ? `<span class="po-hint-warn">신규(제품명 필요)</span>`
+    : `<span class="badge badge-default">신규 등록</span>`;
   return `
-    <tr data-row-index="${i}" class="${isDuplicate ? "po-row-unmatched" : ""}">
+    <tr data-row-index="${i}" class="${willSkip ? "po-row-unmatched" : ""}">
       <td class="editable"><input class="input-cell" type="text" data-pi-field="code" data-row-index="${i}" value="${escapeAttr(r.code)}"></td>
       <td class="editable"><input class="input-cell" type="text" data-pi-field="category" data-row-index="${i}" value="${escapeAttr(r.category)}"></td>
       <td class="editable"><input class="input-cell" type="text" data-pi-field="nameKor" data-row-index="${i}" value="${escapeAttr(r.nameKor)}"></td>
       <td class="editable"><input class="input-cell" type="text" data-pi-field="nameEng" data-row-index="${i}" value="${escapeAttr(r.nameEng)}"></td>
       <td class="editable"><input class="input-cell" type="text" data-pi-field="barcode" data-row-index="${i}" value="${escapeAttr(r.barcode)}"></td>
-      <td class="editable"><input class="input-cell" type="text" data-pi-field="size" data-row-index="${i}" value="${escapeAttr(r.size)}"></td>
       <td class="editable"><input class="input-cell" type="number" data-pi-field="srpKrw" data-row-index="${i}" value="${r.srpKrw ?? ""}"></td>
       <td class="editable"><input class="input-cell" type="number" step="0.01" data-pi-field="srpUsd" data-row-index="${i}" value="${r.srpUsd ?? ""}"></td>
-      <td>${isDuplicate ? `<span class="po-hint-warn">기존 코드</span>` : ""}</td>
+      <td class="editable"><input class="input-cell" type="number" step="0.0001" data-pi-field="fobUsd" data-row-index="${i}" value="${r.fobUsd ?? ""}"></td>
+      <td class="editable"><input class="input-cell" type="number" step="0.1" data-pi-field="fobRatePercent" data-row-index="${i}" value="${r.fobRate != null ? Math.round(r.fobRate * 1000) / 10 : ""}"></td>
+      <td>${statusBadge}</td>
       <td class="no-print"><button class="btn btn-danger btn-sm" data-pi-remove-row="${i}">삭제</button></td>
     </tr>
   `;
@@ -2235,11 +2337,11 @@ function renderProductImportRow(r, i) {
 
 function renderProductUploadSection() {
   const rows = productUploadState.rows;
-  const duplicateCount = rows.filter((r) => getProducts(appData).some((p) => p.code === r.code)).length;
+  const duplicateCount = rows.filter((r) => findExistingProductForImportRow(r)).length;
   return `
     <div class="card no-print">
-      <div class="card-title">파일로 일괄 등록</div>
-      <div class="card-desc">엑셀(.xlsx, .xls, .csv) 파일을 올리면 제품코드·제품명 등 열을 자동으로 인식합니다.</div>
+      <div class="card-title">파일로 일괄 등록·업데이트</div>
+      <div class="card-desc">엑셀(.xlsx, .xls, .csv) 파일을 올리면 제품코드 기준으로, 이미 등록된 제품은 파일 값으로 업데이트하고 없는 제품은 새로 등록합니다. FOB·소비자가만 있는 파일도 가능합니다.</div>
       <div class="po-dropzone" id="product-dropzone">
         <input type="file" id="product-file-input" accept=".xlsx,.xls,.csv" hidden>
         <div class="po-dropzone-icon">📎</div>
@@ -2266,10 +2368,11 @@ function renderProductUploadSection() {
               <th>제품명(국문)</th>
               <th>제품명(영문)</th>
               <th>바코드</th>
-              <th>용량</th>
               <th>기준가(₩)</th>
               <th>기준가($)</th>
-              <th></th>
+              <th>FOB($)</th>
+              <th>FOB(%)</th>
+              <th>상태</th>
               <th class="no-print"></th>
             </tr>
           </thead>
@@ -2278,9 +2381,13 @@ function renderProductUploadSection() {
           </tbody>
         </table>
       </div>
-      ${duplicateCount ? `<p class="field-hint po-hint-warn" style="margin-top:8px">이미 등록된 제품코드 ${duplicateCount}건은 등록 시 건너뜁니다.</p>` : ""}
+      ${duplicateCount ? `<p class="field-hint" style="margin-top:8px">기존 제품 ${duplicateCount}건은 파일에 있는 값만 업데이트되고, 나머지 필드는 그대로 유지됩니다.</p>` : ""}
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--text-secondary)">
+        <input type="checkbox" id="product-apply-srp-channels" ${productUploadState.applySrpToChannels ? "checked" : ""}>
+        소비자가(₩)가 있는 품목은 모든 판매국가의 단가표 기준가로도 반영 (기존 값 덮어씀)
+      </label>
       <div style="display:flex;justify-content:flex-end;margin-top:16px">
-        <button class="btn btn-success btn-lg" id="btn-import-products">💾 ${rows.length}건 일괄 등록</button>
+        <button class="btn btn-success btn-lg" id="btn-import-products">💾 ${rows.length}건 반영 (신규 등록·기존 업데이트)</button>
       </div>
       `
           : ""
@@ -2317,7 +2424,16 @@ function bindProductUploadEvents() {
       const field = e.target.dataset.piField;
       const row = productUploadState.rows[idx];
       if (!row) return;
-      row[field] = field === "srpKrw" || field === "srpUsd" ? parseOptionalNumber(e.target.value) : e.target.value;
+      if (field === "fobRatePercent") {
+        const percent = parseOptionalNumber(e.target.value);
+        row.fobRate = percent != null ? percent / 100 : undefined;
+        return;
+      }
+      if (field === "srpKrw" || field === "srpUsd" || field === "fobUsd") {
+        row[field] = parseOptionalNumber(e.target.value);
+        return;
+      }
+      row[field] = e.target.value;
       if (field === "code") render();
     });
   });
@@ -2330,40 +2446,97 @@ function bindProductUploadEvents() {
     });
   });
 
+  document.getElementById("product-apply-srp-channels")?.addEventListener("change", (e) => {
+    productUploadState.applySrpToChannels = e.target.checked;
+  });
+
   document.getElementById("btn-import-products")?.addEventListener("click", () => {
-    const existingCodes = new Set(getProducts(appData).map((p) => p.code));
     let added = 0;
+    let updated = 0;
     let skipped = 0;
+    const usedCodes = new Set(getProducts(appData).map((p) => p.code));
+    const applySrpToChannels = productUploadState.applySrpToChannels;
+
+    const syncChannelSrp = (code, srpKrw) => {
+      if (!applySrpToChannels || srpKrw == null) return;
+      getChannelList().forEach((ch) => {
+        const current = getChannelSrp(appData, code, ch.id);
+        setChannelSrp(appData, code, ch.id, srpKrw, current.usd);
+      });
+    };
+
     productUploadState.rows.forEach((r) => {
-      if (!r.code?.trim() || !r.nameKor?.trim() || existingCodes.has(r.code)) {
+      const existing = findExistingProductForImportRow(r);
+
+      if (existing) {
+        // 기존 제품은 파일에 실제로 값이 있는 필드만 반영하고 나머지는 그대로 둔다.
+        const updates = {};
+        const setIfPresent = (key, transform = (v) => v) => {
+          const value = r[key];
+          if (value === undefined || value === "") return;
+          updates[key] = transform(value);
+        };
+        setIfPresent("category", (v) => v.trim());
+        setIfPresent("nameKor", (v) => v.trim());
+        setIfPresent("nameEng", (v) => v.trim());
+        setIfPresent("barcode", (v) => v.trim());
+        setIfPresent("size", (v) => v.trim());
+        setIfPresent("cartonQty");
+        setIfPresent("cartonSize", (v) => v.trim());
+        setIfPresent("cbm");
+        setIfPresent("shelfLife");
+        setIfPresent("srpKrw");
+        setIfPresent("srpUsd");
+        setIfPresent("fobUsd");
+        setIfPresent("fobRate");
+        setIfPresent("moq");
+
+        if (!Object.keys(updates).length) {
+          skipped++;
+          return;
+        }
+        const result = updateProduct(appData, existing.code, updates);
+        if (result.ok) {
+          updated++;
+          syncChannelSrp(existing.code, r.srpKrw);
+        } else {
+          skipped++;
+        }
+        return;
+      }
+
+      if (!r.nameKor?.trim()) {
         skipped++;
         return;
       }
+      const code = r.code?.trim() || generateNextProductCode(usedCodes);
       const result = addProduct(appData, {
-        code: r.code.trim(),
+        code,
         category: r.category?.trim() || "기타",
         nameKor: r.nameKor.trim(),
         nameEng: r.nameEng?.trim() || "",
         barcode: r.barcode?.trim() || "",
         size: r.size?.trim() || "",
-        cartonQty: r.cartonQty || 50,
+        cartonQty: r.cartonQty ?? 50,
         cartonSize: r.cartonSize?.trim() || "",
-        cbm: r.cbm || 0,
-        shelfLife: r.shelfLife || 24,
+        cbm: r.cbm ?? 0,
+        shelfLife: r.shelfLife ?? 24,
         srpKrw: r.srpKrw ?? null,
         srpUsd: r.srpUsd ?? null,
         fobUsd: r.fobUsd ?? null,
         fobRate: r.fobRate ?? 0.29,
-        moq: r.moq || 50,
+        moq: r.moq ?? 50,
       });
       if (result.ok) {
         added++;
-        existingCodes.add(r.code);
+        usedCodes.add(code);
+        syncChannelSrp(code, r.srpKrw);
       } else {
         skipped++;
       }
     });
-    showToast(`${added}개 제품이 등록되었습니다${skipped ? ` · ${skipped}건 건너뜀` : ""}`);
+
+    showToast(`신규 ${added}개 등록 · ${updated}개 업데이트됨${skipped ? ` · ${skipped}건 건너뜀` : ""}`);
     productUploadState = freshProductUploadState();
     render();
   });
