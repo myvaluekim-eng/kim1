@@ -119,6 +119,7 @@ function freshProductUploadState() {
     warning: "",
     rows: [],
     applySrpToChannels: true,
+    replaceAll: false,
   };
 }
 
@@ -1982,19 +1983,31 @@ function parseProductForm(fd) {
     nameKor: fd.get("nameKor").trim(),
     nameEng: fd.get("nameEng").trim(),
     barcode: fd.get("barcode").trim() || "",
+    hsCode: fd.get("hsCode")?.trim() || "",
     size: fd.get("size").trim() || "",
     cartonQty: Number(fd.get("cartonQty")) || 50,
     cartonSize: fd.get("cartonSize").trim() || "",
+    cartonWeight: parseOptionalNumber(fd.get("cartonWeight")),
     cbm: Number(fd.get("cbm")) || 0,
     shelfLife: Number(fd.get("shelfLife")) || 24,
     srpKrw: parseOptionalNumber(fd.get("srpKrw")),
     srpUsd: parseOptionalNumber(fd.get("srpUsd")),
     fobUsd: parseOptionalNumber(fd.get("fobUsd")),
+    fobKrw: parseOptionalNumber(fd.get("fobKrw")),
     fobRate:
       parseOptionalNumber(fd.get("fobRate")) != null
         ? parseOptionalNumber(fd.get("fobRate")) / 100
         : null,
+    msrpKrw: parseOptionalNumber(fd.get("msrpKrw")),
+    mappKrw: parseOptionalNumber(fd.get("mappKrw")),
     moq: Number(fd.get("moq")) || 50,
+    moqPcs: parseOptionalNumber(fd.get("moqPcs")),
+    productSize: fd.get("productSize")?.trim() || "",
+    productWeight: parseOptionalNumber(fd.get("productWeight")),
+    palletCartons: parseOptionalNumber(fd.get("palletCartons")),
+    palletPcs: parseOptionalNumber(fd.get("palletPcs")),
+    palletWeight: parseOptionalNumber(fd.get("palletWeight")),
+    countryOrigin: fd.get("countryOrigin")?.trim() || "",
   };
 }
 
@@ -2037,24 +2050,20 @@ function renderProductForm(editProduct = null) {
             <input type="text" name="barcode" placeholder="8800259230xxx" value="${escapeAttr(p.barcode || "")}">
           </div>
           <div class="form-group">
+            <label>HS Code</label>
+            <input type="text" name="hsCode" placeholder="3401119000" value="${escapeAttr(p.hsCode || "")}">
+          </div>
+          <div class="form-group">
             <label>용량</label>
             <input type="text" name="size" placeholder="50ml" value="${escapeAttr(p.size || "")}">
           </div>
           <div class="form-group">
-            <label>박스입수량</label>
-            <input type="number" name="cartonQty" value="${p.cartonQty ?? 50}" min="1">
-          </div>
-          <div class="form-group">
-            <label>카톤박스 사이즈</label>
-            <input type="text" name="cartonSize" placeholder="46.5*24.2*19.5" value="${escapeAttr(p.cartonSize || "")}">
-          </div>
-          <div class="form-group">
-            <label>CBM</label>
-            <input type="number" name="cbm" step="0.00001" value="${p.cbm ?? 0.02}" min="0">
-          </div>
-          <div class="form-group">
             <label>유통기한 (개월)</label>
             <input type="number" name="shelfLife" value="${p.shelfLife ?? 24}" min="1">
+          </div>
+          <div class="form-group">
+            <label>원산지</label>
+            <input type="text" name="countryOrigin" placeholder="Rep.Korea" value="${escapeAttr(p.countryOrigin || "")}">
           </div>
           <div class="form-group">
             <label>기준 소비자가 (₩)</label>
@@ -2067,6 +2076,18 @@ function renderProductForm(editProduct = null) {
               value="${p.srpUsd ?? ""}">
           </div>
           <div class="form-group">
+            <label>MSRP (₩)</label>
+            <input type="number" name="msrpKrw" step="1" min="0" placeholder="46800" value="${p.msrpKrw ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>MAPP (₩)</label>
+            <input type="number" name="mappKrw" step="1" min="0" placeholder="39780" value="${p.mappKrw ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>공급가 FOB (₩)</label>
+            <input type="number" name="fobKrw" step="1" min="0" placeholder="11310" value="${p.fobKrw ?? ""}">
+          </div>
+          <div class="form-group">
             <label>공급가 FOB ($)</label>
             <input type="number" name="fobUsd" step="0.0001" min="0" placeholder="8.5811"
               value="${p.fobUsd ?? ""}">
@@ -2076,8 +2097,48 @@ function renderProductForm(editProduct = null) {
             <input type="number" name="fobRate" value="${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 : 29}" min="1" max="100" step="0.1">
           </div>
           <div class="form-group">
+            <label>개별 제품 사이즈 (W*L*H, cm)</label>
+            <input type="text" name="productSize" placeholder="14.6*4.05*3" value="${escapeAttr(p.productSize || "")}">
+          </div>
+          <div class="form-group">
+            <label>개별 제품 중량 (kg)</label>
+            <input type="number" name="productWeight" step="0.01" min="0" value="${p.productWeight ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>박스입수량 (PCS/CTN)</label>
+            <input type="number" name="cartonQty" value="${p.cartonQty ?? 50}" min="1">
+          </div>
+          <div class="form-group">
+            <label>카톤박스 사이즈 (W*L*H, cm)</label>
+            <input type="text" name="cartonSize" placeholder="46.5*24.2*19.5" value="${escapeAttr(p.cartonSize || "")}">
+          </div>
+          <div class="form-group">
+            <label>카톤박스 중량 (kg)</label>
+            <input type="number" name="cartonWeight" step="0.01" min="0" value="${p.cartonWeight ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>CBM</label>
+            <input type="number" name="cbm" step="0.00001" value="${p.cbm ?? 0.02}" min="0">
+          </div>
+          <div class="form-group">
             <label>MOQ (CTN)</label>
             <input type="number" name="moq" value="${p.moq ?? 50}" min="1">
+          </div>
+          <div class="form-group">
+            <label>MOQ (PCS)</label>
+            <input type="number" name="moqPcs" min="1" value="${p.moqPcs ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>1팔레트 카톤수</label>
+            <input type="number" name="palletCartons" min="0" value="${p.palletCartons ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>1팔레트 개수(PCS)</label>
+            <input type="number" name="palletPcs" min="0" value="${p.palletPcs ?? ""}">
+          </div>
+          <div class="form-group">
+            <label>1팔레트 중량 (kg)</label>
+            <input type="number" name="palletWeight" step="0.1" min="0" value="${p.palletWeight ?? ""}">
           </div>
         </div>
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
@@ -2094,9 +2155,11 @@ const PRODUCT_IMPORT_HEADERS = [
   { key: "nameKor", test: /국문|한글|^namekor$|^name$|\(kor\)/i },
   { key: "nameEng", test: /영문|^nameeng$|^productname$/i },
   { key: "barcode", test: /바코드|^barcode$/i },
+  { key: "hsCode", test: /hscode/i },
   { key: "size", test: /용량|^size$|packing|capacity/i },
   { key: "cartonQty", test: /박스입수|카톤수량|^cartonqty$|1ct.*pcs/i },
   { key: "cartonSize", test: /카톤.*사이즈|박스.*사이즈|^cartonsize$|1ct.*size/i },
+  { key: "cartonWeight", test: /1ct.*weight/i },
   { key: "cbm", test: /^cbm$/i },
   { key: "shelfLife", test: /유통기한|shelflife/i },
   { key: "srpKrw", test: /소비자가.*원|기준가.*원|^srpkrw$|retailprice/i },
@@ -2104,7 +2167,16 @@ const PRODUCT_IMPORT_HEADERS = [
   { key: "fobUsd", test: /fob.*\$|^fobusd$/i },
   { key: "fobKrw", test: /fob.*\(?krw\)?|fob.*원/i },
   { key: "fobRate", test: /fob.*(율|rate)|^fobrate$|fob.*%/i },
+  { key: "msrpKrw", test: /msrp/i },
+  { key: "mappKrw", test: /mapp/i },
   { key: "moq", test: /^moq$|moq.*ctn/i },
+  { key: "moqPcs", test: /moq.*pcs/i },
+  { key: "productSize", test: /productsize/i },
+  { key: "productWeight", test: /productweight/i },
+  { key: "palletCartons", test: /1?pallet.*cts/i },
+  { key: "palletPcs", test: /1?pallet.*pcs/i },
+  { key: "palletWeight", test: /1?pallet.*weight/i },
+  { key: "countryOrigin", test: /country.*origin/i },
 ];
 
 function productImportNumber(text) {
@@ -2209,15 +2281,22 @@ function parseProductMatrix(matrix) {
       if (cbm == null) cbm = converted.cbm;
     }
 
+    let productSize = cell("productSize");
+    if (productSize && unitHints.productSize === "mm") {
+      productSize = mmToCm(productSize).text;
+    }
+
     rows.push({
       code,
       category: cell("category"),
       nameKor: cell("nameKor"),
       nameEng: cell("nameEng"),
       barcode,
+      hsCode: cell("hsCode"),
       size: cell("size"),
       cartonQty: num("cartonQty"),
       cartonSize,
+      cartonWeight: num("cartonWeight"),
       cbm,
       shelfLife: num("shelfLife"),
       srpKrw: num("srpKrw"),
@@ -2225,7 +2304,16 @@ function parseProductMatrix(matrix) {
       fobUsd: num("fobUsd"),
       fobKrw: num("fobKrw"),
       fobRate: fobRateRaw ? productImportNumber(fobRateRaw) / 100 : undefined,
+      msrpKrw: num("msrpKrw"),
+      mappKrw: num("mappKrw"),
       moq: num("moq"),
+      moqPcs: num("moqPcs"),
+      productSize,
+      productWeight: num("productWeight"),
+      palletCartons: num("palletCartons"),
+      palletPcs: num("palletPcs"),
+      palletWeight: num("palletWeight"),
+      countryOrigin: cell("countryOrigin"),
     });
   }
 
@@ -2386,6 +2474,10 @@ function renderProductUploadSection() {
         <input type="checkbox" id="product-apply-srp-channels" ${productUploadState.applySrpToChannels ? "checked" : ""}>
         소비자가(₩)가 있는 품목은 모든 판매국가의 단가표 기준가로도 반영 (기존 값 덮어씀)
       </label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:#b91c1c;font-weight:600">
+        <input type="checkbox" id="product-replace-all" ${productUploadState.replaceAll ? "checked" : ""}>
+        ⚠️ 전체 교체 — 기존에 등록된 제품을 모두 삭제하고 이 파일 내용으로만 새로 등록
+      </label>
       <div style="display:flex;justify-content:flex-end;margin-top:16px">
         <button class="btn btn-success btn-lg" id="btn-import-products">💾 ${rows.length}건 반영 (신규 등록·기존 업데이트)</button>
       </div>
@@ -2450,11 +2542,30 @@ function bindProductUploadEvents() {
     productUploadState.applySrpToChannels = e.target.checked;
   });
 
-  document.getElementById("btn-import-products")?.addEventListener("click", () => {
+  document.getElementById("product-replace-all")?.addEventListener("change", (e) => {
+    productUploadState.replaceAll = e.target.checked;
+  });
+
+  document.getElementById("btn-import-products")?.addEventListener("click", async () => {
+    if (productUploadState.replaceAll) {
+      const confirmed = await confirmAction({
+        label: "전체 교체 확인",
+        title: "기존 제품 전체 삭제 후 새로 등록",
+        details: [
+          `현재 등록된 제품 ${getProducts(appData).length}개가 모두 삭제됩니다.`,
+          `이 파일의 품목 ${productUploadState.rows.length}건으로 새로 등록됩니다.`,
+        ],
+        warning: "삭제된 기존 제품 정보는 되돌릴 수 없습니다. 계속하시겠습니까?",
+        confirmText: "전체 교체",
+        cancelText: "취소",
+        type: "delete",
+      });
+      if (!confirmed) return;
+    }
+
     let added = 0;
     let updated = 0;
     let skipped = 0;
-    const usedCodes = new Set(getProducts(appData).map((p) => p.code));
     const applySrpToChannels = productUploadState.applySrpToChannels;
 
     const syncChannelSrp = (code, srpKrw) => {
@@ -2465,77 +2576,129 @@ function bindProductUploadEvents() {
       });
     };
 
-    productUploadState.rows.forEach((r) => {
-      const existing = findExistingProductForImportRow(r);
+    const buildNewProductPayload = (r, code) => ({
+      code,
+      category: r.category?.trim() || "기타",
+      nameKor: r.nameKor.trim(),
+      nameEng: r.nameEng?.trim() || "",
+      barcode: r.barcode?.trim() || "",
+      hsCode: r.hsCode?.trim() || "",
+      size: r.size?.trim() || "",
+      cartonQty: r.cartonQty ?? 50,
+      cartonSize: r.cartonSize?.trim() || "",
+      cartonWeight: r.cartonWeight ?? null,
+      cbm: r.cbm ?? 0,
+      shelfLife: r.shelfLife ?? 24,
+      srpKrw: r.srpKrw ?? null,
+      srpUsd: r.srpUsd ?? null,
+      fobUsd: r.fobUsd ?? null,
+      fobKrw: r.fobKrw ?? null,
+      fobRate: r.fobRate ?? 0.29,
+      msrpKrw: r.msrpKrw ?? null,
+      mappKrw: r.mappKrw ?? null,
+      moq: r.moq ?? 50,
+      moqPcs: r.moqPcs ?? null,
+      productSize: r.productSize?.trim() || "",
+      productWeight: r.productWeight ?? null,
+      palletCartons: r.palletCartons ?? null,
+      palletPcs: r.palletPcs ?? null,
+      palletWeight: r.palletWeight ?? null,
+      countryOrigin: r.countryOrigin?.trim() || "",
+    });
 
-      if (existing) {
-        // 기존 제품은 파일에 실제로 값이 있는 필드만 반영하고 나머지는 그대로 둔다.
-        const updates = {};
-        const setIfPresent = (key, transform = (v) => v) => {
-          const value = r[key];
-          if (value === undefined || value === "") return;
-          updates[key] = transform(value);
-        };
-        setIfPresent("category", (v) => v.trim());
-        setIfPresent("nameKor", (v) => v.trim());
-        setIfPresent("nameEng", (v) => v.trim());
-        setIfPresent("barcode", (v) => v.trim());
-        setIfPresent("size", (v) => v.trim());
-        setIfPresent("cartonQty");
-        setIfPresent("cartonSize", (v) => v.trim());
-        setIfPresent("cbm");
-        setIfPresent("shelfLife");
-        setIfPresent("srpKrw");
-        setIfPresent("srpUsd");
-        setIfPresent("fobUsd");
-        setIfPresent("fobRate");
-        setIfPresent("moq");
-
-        if (!Object.keys(updates).length) {
+    if (productUploadState.replaceAll) {
+      // 전체 교체: getProducts()는 배열이 비어 있으면 DEFAULT_PRODUCTS로 되돌아가므로
+      // addProduct()를 반복 호출하지 않고, 새 배열을 다 만든 뒤 한 번에 교체한다.
+      const newProducts = [];
+      const usedCodes = new Set();
+      productUploadState.rows.forEach((r) => {
+        if (!r.nameKor?.trim()) {
           skipped++;
           return;
         }
-        const result = updateProduct(appData, existing.code, updates);
+        const code = r.code?.trim() || generateNextProductCode(usedCodes);
+        if (usedCodes.has(code)) {
+          skipped++;
+          return;
+        }
+        newProducts.push(buildNewProductPayload(r, code));
+        usedCodes.add(code);
+        added++;
+      });
+      appData.products = newProducts;
+      appData.channelSrp = {};
+      newProducts.forEach((p) => syncChannelSrp(p.code, p.srpKrw));
+    } else {
+      const usedCodes = new Set(getProducts(appData).map((p) => p.code));
+      productUploadState.rows.forEach((r) => {
+        const existing = findExistingProductForImportRow(r);
+
+        if (existing) {
+          // 기존 제품은 파일에 실제로 값이 있는 필드만 반영하고 나머지는 그대로 둔다.
+          const updates = {};
+          const setIfPresent = (key, transform = (v) => v) => {
+            const value = r[key];
+            if (value === undefined || value === "") return;
+            updates[key] = transform(value);
+          };
+          setIfPresent("category", (v) => v.trim());
+          setIfPresent("nameKor", (v) => v.trim());
+          setIfPresent("nameEng", (v) => v.trim());
+          setIfPresent("barcode", (v) => v.trim());
+          setIfPresent("hsCode", (v) => v.trim());
+          setIfPresent("size", (v) => v.trim());
+          setIfPresent("cartonQty");
+          setIfPresent("cartonSize", (v) => v.trim());
+          setIfPresent("cartonWeight");
+          setIfPresent("cbm");
+          setIfPresent("shelfLife");
+          setIfPresent("srpKrw");
+          setIfPresent("srpUsd");
+          setIfPresent("fobUsd");
+          setIfPresent("fobKrw");
+          setIfPresent("fobRate");
+          setIfPresent("msrpKrw");
+          setIfPresent("mappKrw");
+          setIfPresent("moq");
+          setIfPresent("moqPcs");
+          setIfPresent("productSize", (v) => v.trim());
+          setIfPresent("productWeight");
+          setIfPresent("palletCartons");
+          setIfPresent("palletPcs");
+          setIfPresent("palletWeight");
+          setIfPresent("countryOrigin", (v) => v.trim());
+
+          if (!Object.keys(updates).length) {
+            skipped++;
+            return;
+          }
+          const result = updateProduct(appData, existing.code, updates);
+          if (result.ok) {
+            updated++;
+            syncChannelSrp(existing.code, r.srpKrw);
+          } else {
+            skipped++;
+          }
+          return;
+        }
+
+        if (!r.nameKor?.trim()) {
+          skipped++;
+          return;
+        }
+        const code = r.code?.trim() || generateNextProductCode(usedCodes);
+        const result = addProduct(appData, buildNewProductPayload(r, code));
         if (result.ok) {
-          updated++;
-          syncChannelSrp(existing.code, r.srpKrw);
+          added++;
+          usedCodes.add(code);
+          syncChannelSrp(code, r.srpKrw);
         } else {
           skipped++;
         }
-        return;
-      }
-
-      if (!r.nameKor?.trim()) {
-        skipped++;
-        return;
-      }
-      const code = r.code?.trim() || generateNextProductCode(usedCodes);
-      const result = addProduct(appData, {
-        code,
-        category: r.category?.trim() || "기타",
-        nameKor: r.nameKor.trim(),
-        nameEng: r.nameEng?.trim() || "",
-        barcode: r.barcode?.trim() || "",
-        size: r.size?.trim() || "",
-        cartonQty: r.cartonQty ?? 50,
-        cartonSize: r.cartonSize?.trim() || "",
-        cbm: r.cbm ?? 0,
-        shelfLife: r.shelfLife ?? 24,
-        srpKrw: r.srpKrw ?? null,
-        srpUsd: r.srpUsd ?? null,
-        fobUsd: r.fobUsd ?? null,
-        fobRate: r.fobRate ?? 0.29,
-        moq: r.moq ?? 50,
       });
-      if (result.ok) {
-        added++;
-        usedCodes.add(code);
-        syncChannelSrp(code, r.srpKrw);
-      } else {
-        skipped++;
-      }
-    });
+    }
 
+    saveData(appData);
     showToast(`신규 ${added}개 등록 · ${updated}개 업데이트됨${skipped ? ` · ${skipped}건 건너뜀` : ""}`);
     productUploadState = freshProductUploadState();
     render();
@@ -2569,14 +2732,27 @@ function renderProducts() {
               <th>제품명 (KOR)</th>
               <th>제품명 (ENG)</th>
               <th>바코드</th>
+              <th>HS Code</th>
+              <th>원산지</th>
               <th>용량</th>
-              <th>박스입수량</th>
-              <th>CBM</th>
               <th>유통기한</th>
               <th>기준가(₩)</th>
               <th>기준가($)</th>
+              <th>MSRP(₩)</th>
+              <th>MAPP(₩)</th>
+              <th>FOB(₩)</th>
               <th>FOB($)</th>
-              <th>MOQ</th>
+              <th>박스입수량</th>
+              <th>카톤사이즈</th>
+              <th>카톤중량</th>
+              <th>CBM</th>
+              <th>MOQ(CTN)</th>
+              <th>MOQ(PCS)</th>
+              <th>제품사이즈</th>
+              <th>제품중량</th>
+              <th>팔레트(CTN)</th>
+              <th>팔레트(PCS)</th>
+              <th>팔레트중량</th>
               <th class="no-print"></th>
             </tr>
           </thead>
@@ -2590,14 +2766,27 @@ function renderProducts() {
                 <td>${p.nameKor}</td>
                 <td style="font-size:12px;color:var(--text-muted)">${p.nameEng}</td>
                 <td style="font-size:12px">${p.barcode || "—"}</td>
+                <td style="font-size:12px">${p.hsCode || "—"}</td>
+                <td>${p.countryOrigin || "—"}</td>
                 <td>${p.size || "—"}</td>
-                <td>${p.cartonQty}</td>
-                <td>${p.cbm}</td>
                 <td>${p.shelfLife}개월</td>
                 <td>${p.srpKrw != null ? formatKrw(p.srpKrw) : "—"}</td>
                 <td>${p.srpUsd != null ? formatUsd(p.srpUsd) : "—"}</td>
+                <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
+                <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
+                <td>${p.fobKrw != null ? formatKrw(p.fobKrw) : "—"}</td>
                 <td>${p.fobUsd != null ? formatUsd(p.fobUsd) : "—"}</td>
+                <td>${p.cartonQty}</td>
+                <td style="font-size:12px">${p.cartonSize || "—"}</td>
+                <td>${p.cartonWeight ?? "—"}</td>
+                <td>${p.cbm}</td>
                 <td>${p.moq}</td>
+                <td>${p.moqPcs ?? "—"}</td>
+                <td style="font-size:12px">${p.productSize || "—"}</td>
+                <td>${p.productWeight ?? "—"}</td>
+                <td>${p.palletCartons ?? "—"}</td>
+                <td>${p.palletPcs ?? "—"}</td>
+                <td>${p.palletWeight ?? "—"}</td>
                 <td class="no-print">
                   <div style="display:flex;gap:6px;flex-wrap:wrap">
                     <button class="btn btn-secondary btn-sm" data-edit-product="${p.code}">수정</button>
