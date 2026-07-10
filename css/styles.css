@@ -1452,6 +1452,12 @@ td.total-row {
 .badge-us { background: var(--accent-light); color: #8b5a42; }
 
 /* ── History ── */
+.history-type-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
 .history-item {
   display: flex;
   align-items: center;

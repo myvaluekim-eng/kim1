@@ -357,9 +357,99 @@ function buildProposalDocumentHtml(proposal) {
   `;
 }
 
+function buildEstimateDocumentHtml(proposal) {
+  const channel = getChannelList().find((c) => c.id === proposal.channelId);
+  const items = getProposalDisplayItems(proposal).filter((item) => (item.poQty || 0) > 0);
+  const totals = getProposalDisplayTotals(items, channel);
+  const terms = proposal.terms || [];
+  const currency = getProposalCurrency(proposal, channel);
+  const currencySymbol = currency === "KRW" ? "₩" : "$";
+
+  const tableRows = items
+    .map(
+      (item) => `
+      <tr>
+        <td>
+          <div class="proposal-doc-product">${item.nameKor}</div>
+          ${item.nameEng ? `<div class="proposal-doc-sub">${item.nameEng}</div>` : ""}
+        </td>
+        <td class="num">${currency === "KRW" ? formatKrw(item.fobKrw) : formatUsd(item.fobUsd)}</td>
+        <td class="num">${item.poQty || 0}</td>
+        <td class="num">${formatNumber(item.ctn, 2)}</td>
+        <td class="num">${formatNumber(item.cbmQty, 4)}</td>
+        <td class="num">${formatMoney(item.amount, currency)}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `
+    <div class="proposal-doc proposal-doc--plain">
+      <table class="proposal-doc-table">
+        <colgroup>
+          <col class="col-product">
+          <col class="col-num">
+          <col class="col-qty">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-amount">
+        </colgroup>
+        <tbody class="proposal-doc-sheet">
+          <tr class="proposal-doc-head-title">
+            <td colspan="6">
+              <div class="proposal-doc-head-main">ESTIMATE</div>
+              <div class="proposal-doc-head-subline">Barle Cosmetics</div>
+            </td>
+          </tr>
+          <tr class="proposal-doc-meta-row">
+            <td class="meta-label">Buyer</td>
+            <td colspan="2">${proposal.clientName}</td>
+            <td class="meta-label">Date</td>
+            <td colspan="2">${proposal.poDate || "—"}</td>
+          </tr>
+          <tr class="proposal-doc-meta-row">
+            <td class="meta-label">Market</td>
+            <td colspan="2">${channel?.name || "—"}</td>
+            <td class="meta-label">Total</td>
+            <td colspan="2">${formatMoney(totals.totalAmount, currency)}</td>
+          </tr>
+          <tr class="proposal-doc-colhead">
+            <td>Product</td>
+            <td>Price (${currencySymbol})</td>
+            <td>Qty</td>
+            <td>CTN</td>
+            <td>CBM</td>
+            <td>Amount</td>
+          </tr>
+          ${tableRows}
+          <tr class="proposal-doc-total">
+            <td colspan="3" class="total-label">TOTAL</td>
+            <td class="num">${formatNumber(totals.totalCtn, 2)}</td>
+            <td class="num">${formatNumber(totals.totalCbm, 4)}</td>
+            <td class="num">${formatMoney(totals.totalAmount, currency)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      ${
+        terms.length
+          ? `
+      <div class="proposal-doc-terms">
+        <p class="proposal-doc-terms-title">Terms &amp; Conditions</p>
+        ${terms.map((t) => `<p>${t}</p>`).join("")}
+      </div>`
+          : ""
+      }
+
+      <p class="proposal-doc-footer">Barle Cosmetics · barle.co.kr</p>
+    </div>
+  `;
+}
+
 function getProposalPdfFilename(proposal) {
   const safeName = (proposal.clientName || "buyer").replace(/[/\\?%*:|"<>]/g, "_");
-  return `Barle_PriceList_${safeName}_v${proposal.version}_${proposal.poDate || "draft"}.pdf`;
+  const isEstimate = getRecordType(proposal) === "estimate";
+  const label = isEstimate ? "Estimate" : "PriceList";
+  return `Barle_${label}_${safeName}_v${proposal.version}_${proposal.poDate || "draft"}.pdf`;
 }
 
 async function exportProposalToPdf(proposal) {
@@ -370,7 +460,10 @@ async function exportProposalToPdf(proposal) {
 
   const container = document.createElement("div");
   container.className = "proposal-pdf-root";
-  container.innerHTML = buildProposalDocumentHtml(proposal);
+  container.innerHTML =
+    getRecordType(proposal) === "estimate"
+      ? buildEstimateDocumentHtml(proposal)
+      : buildProposalDocumentHtml(proposal);
   document.body.appendChild(container);
 
   const el = container.querySelector(".proposal-doc");

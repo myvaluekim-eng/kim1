@@ -336,6 +336,11 @@ function getOrders(data, channelId) {
   return list.filter((p) => getRecordType(p) === "order");
 }
 
+function getEstimates(data, channelId) {
+  const list = channelId ? getProposals(data, channelId) : data.proposals;
+  return list.filter((p) => getRecordType(p) === "estimate");
+}
+
 function saveProposal(data, proposal) {
   const recordType = proposal.recordType || "quote";
   const channelProposals = data.proposals.filter(

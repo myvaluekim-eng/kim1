@@ -4,6 +4,11 @@ function exportProposalToExcel(proposal) {
     return;
   }
 
+  if (getRecordType(proposal) === "estimate") {
+    exportEstimateToExcel(proposal);
+    return;
+  }
+
   const ch = getChannels(appData).find((c) => c.id === proposal.channelId);
   const items = getProposalDisplayItems(proposal);
   const totals = getProposalDisplayTotals(items, ch);
@@ -100,6 +105,56 @@ function exportProposalToExcel(proposal) {
   XLSX.utils.book_append_sheet(wb, ws, ch.name.slice(0, 31));
   const safeName = proposal.clientName.replace(/[/\\?%*:|"<>]/g, "_");
   const filename = `PriceList_${safeName}_v${proposal.version}_${proposal.poDate}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+function exportEstimateToExcel(proposal) {
+  const ch = getChannels(appData).find((c) => c.id === proposal.channelId);
+  const items = getProposalDisplayItems(proposal).filter((item) => (item.poQty || 0) > 0);
+  const totals = getProposalDisplayTotals(items, ch);
+  const currency = getProposalCurrency(proposal, ch);
+  const currencySymbol = currency === "KRW" ? "₩" : "$";
+
+  const rows = [
+    ["ESTIMATE"],
+    ["Market", ch.name],
+    ["Buyer", proposal.clientName],
+    ["Date", proposal.poDate],
+    ["Version", `v${proposal.version}`],
+    [],
+    ["Product (KOR)", "Product (ENG)", `Price (${currencySymbol})`, "Qty", "CTN", "CBM", "Amount"],
+  ];
+
+  items.forEach((item) => {
+    rows.push([
+      item.nameKor,
+      item.nameEng || "",
+      (currency === "KRW" ? item.fobKrw : item.fobUsd) ?? "",
+      item.poQty ?? 0,
+      item.ctn ?? "",
+      item.cbmQty ?? "",
+      item.amount ?? 0,
+    ]);
+  });
+
+  rows.push([]);
+  const totalRow = new Array(7).fill("");
+  totalRow[0] = "TOTAL";
+  totalRow[4] = totals.totalCtn;
+  totalRow[5] = totals.totalCbm;
+  totalRow[6] = totals.totalAmount;
+  rows.push(totalRow);
+  rows.push([]);
+  rows.push(["Terms & Conditions"]);
+  (proposal.terms || []).forEach((t) => rows.push([t]));
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = new Array(7).fill({ wch: 16 });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, ch.name.slice(0, 31));
+  const safeName = proposal.clientName.replace(/[/\\?%*:|"<>]/g, "_");
+  const filename = `Estimate_${safeName}_v${proposal.version}_${proposal.poDate}.xlsx`;
   XLSX.writeFile(wb, filename);
 }
 

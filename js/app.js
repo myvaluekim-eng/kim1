@@ -92,6 +92,7 @@ ensureStoreCompat();
 let appData = loadData();
 let currentView = "dashboard";
 let historyFilter = "";
+let historyRecordType = "quote";
 let clientFilter = "";
 let salesMonth = new Date().toISOString().slice(0, 7);
 let salesChannelId = "";
@@ -155,6 +156,12 @@ function getChannelList() {
 
 function findChannel(channelId) {
   return getChannelList().find((c) => c.id === channelId) || getChannelList()[0];
+}
+
+function getRecordTypeLabel(recordType) {
+  if (recordType === "order") return "발주서";
+  if (recordType === "estimate") return "견적서";
+  return "단가표";
 }
 
 function initProposalState(channelId) {
@@ -478,9 +485,10 @@ function setupGlobalDeleteHandlers() {
       const proposal = getProposalById(appData, id);
       if (!proposal) return;
       const ch = getChannelList().find((c) => c.id === proposal.channelId);
+      const recordLabel = getRecordTypeLabel(getRecordType(proposal));
       if (
         !(await confirmDelete(
-          getRecordType(proposal) === "order" ? "발주서 삭제" : "단가표 삭제",
+          `${recordLabel} 삭제`,
           `업체: ${proposal.clientName}\n판매국가: ${ch?.name}\n버전: v${proposal.version}\n작성일: ${proposal.poDate}`
         ))
       ) {
@@ -491,7 +499,7 @@ function setupGlobalDeleteHandlers() {
         showToast(result.error);
         return;
       }
-      showToast(getRecordType(proposal) === "order" ? "발주서가 삭제되었습니다" : "단가표가 삭제되었습니다");
+      showToast(`${recordLabel}가 삭제되었습니다`);
       render();
     }
   });
@@ -954,6 +962,7 @@ function renderProposal() {
           <button type="button" class="btn btn-secondary" id="btn-pdf-proposal">📄 PDF 저장</button>
           <button type="button" class="btn btn-secondary" id="btn-print">🖨 인쇄</button>
           <button type="button" class="btn btn-success" id="btn-save">💾 저장하기</button>
+          <button type="button" class="btn btn-primary" id="btn-save-estimate">🧾 견적서</button>
         </div>
       </div>
     </div>
@@ -1148,6 +1157,49 @@ function bindProposalEvents() {
       recordType: "quote",
     });
     showToast(`단가표 저장 완료 — v${version} (지난 단가표에서 확인)`);
+  });
+
+  document.getElementById("btn-save-estimate").addEventListener("click", () => {
+    const selected = readProposalClientFromDom();
+    if (!selected) {
+      showToast("업체를 선택해주세요");
+      return;
+    }
+    proposalState.channelId = selected.channelId;
+    proposalState.clientId = selected.clientId;
+    proposalState.clientName = selected.clientName;
+    const channel = findChannel(selected.channelId);
+    const products = getProducts(appData).filter((p) => (proposalState.items[p.code]?.poQty || 0) > 0);
+    if (products.length === 0) {
+      showToast("주문수량을 입력한 제품이 없습니다");
+      return;
+    }
+    const terms = getChannelTerms(appData, proposalState.channelId);
+    const items = products.map((p) => {
+      const item = proposalState.items[p.code];
+      const { fobUsd, fobKrw } = calcFobFromSrp(
+        item.srpKrw,
+        item.srpUsd,
+        proposalState.fobRate,
+        proposalState.exchangeRate
+      );
+      return buildProposalItemSnapshot(p, item, proposalState, channel, fobUsd, fobKrw);
+    });
+    const totalAmount = items.reduce((s, i) => s + i.amount, 0);
+    const version = saveProposal(appData, {
+      channelId: selected.channelId,
+      clientId: selected.clientId,
+      clientName: selected.clientName,
+      poDate: proposalState.poDate,
+      fobRate: proposalState.fobRate,
+      exchangeRate: proposalState.exchangeRate,
+      priceCurrency: proposalState.currency,
+      items,
+      totalAmount,
+      terms,
+      recordType: "estimate",
+    });
+    showToast(`견적서 저장 완료 — v${version} (지난 단가표에서 확인)`);
   });
 
   document.getElementById("btn-print").addEventListener("click", () => window.print());
@@ -3284,10 +3336,23 @@ function bindMasterDeleteHandlers() {
 
 function renderHistory() {
   const filterChannel = historyFilter;
-  const proposals = getQuotes(appData, filterChannel || null);
+  const recordType = historyRecordType === "estimate" ? "estimate" : "quote";
+  const label = recordType === "estimate" ? "견적서" : "단가표";
+  const proposals =
+    recordType === "estimate"
+      ? getEstimates(appData, filterChannel || null)
+      : getQuotes(appData, filterChannel || null);
+
+  const tabs = `
+    <div class="history-type-tabs no-print">
+      <button type="button" class="btn ${recordType === "quote" ? "btn-primary" : "btn-secondary"}" data-history-type="quote">단가표</button>
+      <button type="button" class="btn ${recordType === "estimate" ? "btn-primary" : "btn-secondary"}" data-history-type="estimate">견적서</button>
+    </div>
+  `;
 
   if (proposals.length === 0) {
     return `
+      ${tabs}
       <div class="form-row no-print">
         <div class="form-group">
           <label>국가 필터</label>
@@ -3300,7 +3365,7 @@ function renderHistory() {
       <div class="card">
         <div class="empty-state">
           <div class="empty-icon">📋</div>
-          저장된 단가표가 없습니다.<br>
+          저장된 ${label}가 없습니다.<br>
           <button class="btn btn-primary" style="margin-top:16px" onclick="setView('proposal')">단가표 만들기 →</button>
         </div>
       </div>
@@ -3308,6 +3373,7 @@ function renderHistory() {
   }
 
   return `
+    ${tabs}
     <div class="form-row no-print">
       <div class="form-group">
         <label>국가 필터</label>
@@ -3321,7 +3387,7 @@ function renderHistory() {
       </div>
     </div>
     <div class="card">
-      <div class="card-title">저장된 단가표 (${proposals.length}건)</div>
+      <div class="card-title">저장된 ${label} (${proposals.length}건)</div>
       ${proposals
         .map((p) => {
           const ch = getChannelList().find((c) => c.id === p.channelId);
@@ -3356,12 +3422,22 @@ function bindHistoryEvents() {
       render();
     });
   }
+  document.querySelectorAll("[data-history-type]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      historyRecordType = e.target.dataset.historyType;
+      render();
+    });
+  });
   document.querySelectorAll("[data-view-id]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const proposal = getProposalById(appData, e.target.dataset.viewId);
       if (!proposal) return;
       const ch = getChannelList().find((c) => c.id === proposal.channelId);
       const detail = document.getElementById("history-detail");
+      const docHtml =
+        getRecordType(proposal) === "estimate"
+          ? buildEstimateDocumentHtml(proposal)
+          : buildProposalDocumentHtml(proposal);
       detail.innerHTML = `
         <div class="card proposal-history-detail" style="margin-top:20px">
           <div class="proposal-history-detail-header no-print">
@@ -3373,7 +3449,7 @@ function bindHistoryEvents() {
             </div>
           </div>
           <div class="proposal-doc-preview">
-            ${buildProposalDocumentHtml(proposal)}
+            ${docHtml}
           </div>
         </div>
       `;
