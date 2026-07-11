@@ -1772,33 +1772,57 @@ td.total-row {
 .proposal-doc-table .col-qty { width: 5%; }
 .proposal-doc-table .col-amount { width: 7%; }
 
+/* Content-proportional column widths for the price-list document (not uniform) */
+.proposal-doc-table .col-category { width: 5%; }
+.proposal-doc-table .col-barcode { width: 8%; }
+.proposal-doc-table .col-hscode { width: 6%; }
+.proposal-doc-table .col-shelflife { width: 4%; }
+.proposal-doc-table .col-srp { width: 6%; }
+.proposal-doc-table .col-fobrate { width: 4%; }
+.proposal-doc-table .col-fob { width: 6%; }
+.proposal-doc-table .col-msrp { width: 6%; }
+.proposal-doc-table .col-mapp { width: 6%; }
+.proposal-doc-table .col-cartonqty { width: 4%; }
+.proposal-doc-table .col-moqpcs { width: 4%; }
+.proposal-doc-table .col-moqctn { width: 4%; }
+.proposal-doc-table .col-productsize { width: 7%; }
+.proposal-doc-table .col-productwt { width: 4%; }
+.proposal-doc-table .col-cartonsize { width: 7%; }
+.proposal-doc-table .col-cartonwt { width: 4%; }
+.proposal-doc-table .col-palletctn { width: 4%; }
+.proposal-doc-table .col-palletpcs { width: 4%; }
+.proposal-doc-table .col-palletwt { width: 4%; }
+.proposal-doc-table .col-origin { width: 5%; }
+
 .proposal-doc-head-title td {
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 700;
   text-align: center;
-  padding: 2px 5px;
+  padding: 10px 5px;
   border: 1px solid #000;
   vertical-align: middle;
 }
 
 .proposal-doc-head-main {
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.3;
+  letter-spacing: 0.3px;
 }
 
 .proposal-doc-head-subline {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
-  margin-top: 1px;
-  line-height: 1.2;
+  margin-top: 3px;
+  line-height: 1.3;
 }
 
 .proposal-doc-meta-row td {
   font-size: 11px;
-  padding: 3px 6px;
+  padding: 4px 7px;
   border: 1px solid #000;
   vertical-align: middle;
+  letter-spacing: 0.1px;
 }
 
 .proposal-doc-meta-row .meta-label {
@@ -1808,22 +1832,24 @@ td.total-row {
 }
 
 .proposal-doc-table td {
-  padding: 4px 5px;
+  padding: 6px 8px;
   border: 1px solid #000;
   vertical-align: top;
   word-break: break-word;
   background: #fff;
   color: #000;
-  line-height: 1.25;
+  line-height: 1.45;
+  letter-spacing: 0.15px;
 }
 
 .proposal-doc-colhead td {
-  padding: 3px 5px 4px;
+  padding: 5px 6px 6px;
   vertical-align: top;
   text-align: center;
   font-weight: 700;
   font-size: 11px;
-  line-height: 1.1;
+  line-height: 1.3;
+  letter-spacing: 0.1px;
   border: 1px solid #000;
 }
 
