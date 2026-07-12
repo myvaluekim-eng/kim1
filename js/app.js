@@ -736,7 +736,7 @@ function renderDashboard() {
     <div class="dashboard-section no-print">
       <p class="dashboard-section-label">메인 업무</p>
       <div class="action-grid action-grid-main">
-        <button class="action-card primary" onclick="setView('proposal')">
+        <button class="action-card primary-alt" onclick="setView('proposal')">
           <div class="action-icon">📋</div>
           <div class="action-title">단가표 만들기</div>
           <div class="action-desc">바이어에게 보낼 견적 · 가격표 작성</div>
