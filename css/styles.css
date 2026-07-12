@@ -7,18 +7,18 @@
 }
 
 :root {
-  --bg: #f7f3ee;
-  --bg-soft: #faf7f2;
-  --sidebar: #fffcf8;
-  --sidebar-border: #ebe4da;
-  --primary: #3d5a48;
-  --primary-light: #eef4ef;
-  --primary-hover: #2f4638;
-  --accent: #c9957a;
-  --accent-light: #faf0ea;
-  --accent-soft: #e8d5c8;
-  --border: #e8e0d6;
-  --text: #2c2825;
+  --bg: #fbf8ec;
+  --bg-soft: #f7f0d2;
+  --sidebar: #fffdf3;
+  --sidebar-border: #eee0ad;
+  --primary: #b7922a;
+  --primary-light: #fbf3d9;
+  --primary-hover: #967a1f;
+  --accent: #e8c34a;
+  --accent-light: #fdf6df;
+  --accent-soft: #f0dfa0;
+  --border: #ede3c0;
+  --text: #2b2620;
   --text-secondary: #5c534c;
   --text-muted: #8a8178;
   --card: #ffffff;
@@ -28,8 +28,8 @@
   --warning-light: #fdf8ed;
   --editable-bg: #fffbf0;
   --editable-border: #e8d4a8;
-  --auto-bg: #eef4ef;
-  --auto-text: #3d5a48;
+  --auto-bg: #eef2f6;
+  --auto-text: #47576b;
   --input-border: #ddd4c8;
   --shadow: 0 2px 8px rgba(44, 40, 37, 0.04);
   --shadow-lg: 0 12px 32px rgba(44, 40, 37, 0.08);
@@ -44,8 +44,8 @@ html {
 body {
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   background: var(--bg);
-  background-image: radial-gradient(ellipse at top left, rgba(201, 149, 122, 0.08), transparent 50%),
-    radial-gradient(ellipse at bottom right, rgba(61, 90, 72, 0.06), transparent 45%);
+  background-image: radial-gradient(ellipse at top left, rgba(232, 195, 74, 0.12), transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(183, 146, 42, 0.08), transparent 45%);
   color: var(--text);
   display: flex;
   min-height: 100vh;
@@ -69,11 +69,12 @@ body {
 }
 
 .sidebar-logo {
-  padding: 28px 22px 22px;
+  padding: 26px 22px 20px;
   border-bottom: 1px solid var(--sidebar-border);
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .sidebar-logo-btn {
@@ -94,20 +95,14 @@ body {
   outline-offset: -2px;
 }
 
-.logo-mark {
-  min-width: 52px;
-  height: 36px;
-  padding: 0 10px;
-  background: linear-gradient(135deg, #3d5a48 0%, #5a7d62 100%);
-  color: #fff;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
+.logo-wordmark {
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  flex-shrink: 0;
+  font-style: italic;
+  font-size: 30px;
+  color: #1f1b16;
+  letter-spacing: -0.01em;
+  line-height: 1;
 }
 
 .sidebar-logo h1 {
@@ -170,10 +165,10 @@ body {
 }
 
 .nav-item-home.active {
-  background: linear-gradient(135deg, var(--accent) 0%, #b88468 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #c9a227 100%);
   border-color: var(--accent) !important;
   color: #fff;
-  box-shadow: 0 6px 16px rgba(201, 149, 122, 0.28);
+  box-shadow: 0 6px 16px rgba(232, 195, 74, 0.35);
 }
 
 .nav-item-home.active .nav-text strong,
@@ -200,7 +195,7 @@ body {
 
 .nav-item-main {
   background: linear-gradient(135deg, #fff 0%, var(--primary-light) 100%);
-  border: 1px solid #c8d9cc !important;
+  border: 1px solid #f0dfa0 !important;
   margin-bottom: 8px;
   padding: 14px 16px;
 }
@@ -211,10 +206,10 @@ body {
 }
 
 .nav-item-main.active {
-  background: linear-gradient(135deg, var(--primary) 0%, #4a6b55 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #8a6c1f 100%);
   border-color: var(--primary) !important;
   color: #fff;
-  box-shadow: 0 8px 20px rgba(61, 90, 72, 0.22);
+  box-shadow: 0 8px 20px rgba(183, 146, 42, 0.28);
 }
 
 .nav-item-main.active .nav-text strong,
@@ -259,7 +254,7 @@ body {
 
 .nav-item.active {
   background: var(--primary-light);
-  border-color: #c8d9cc;
+  border-color: #f0dfa0;
   color: var(--primary);
 }
 
@@ -558,7 +553,7 @@ body {
 }
 
 .action-card.primary {
-  background: linear-gradient(145deg, #3d5a48 0%, #527a60 100%);
+  background: linear-gradient(145deg, #b7922a 0%, #d4af37 100%);
   border-color: transparent;
   color: #fff;
   min-height: 140px;
@@ -674,7 +669,7 @@ body {
   gap: 12px;
   align-items: flex-start;
   background: var(--primary-light);
-  border: 1px solid #c8d9cc;
+  border: 1px solid #f0dfa0;
   border-radius: 12px;
   padding: 14px 18px;
   margin-bottom: 20px;
@@ -724,7 +719,7 @@ body {
 
 .legend-swatch.auto {
   background: var(--auto-bg);
-  border-color: #c8d9cc;
+  border-color: #f0dfa0;
 }
 
 /* ── Stats ── */
@@ -818,7 +813,7 @@ body {
 .form-group select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(61, 90, 72, 0.12);
+  box-shadow: 0 0 0 3px rgba(183, 146, 42, 0.18);
 }
 
 .form-grid {
@@ -1411,7 +1406,7 @@ td.total-row {
 .input-cell:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(61, 90, 72, 0.12);
+  box-shadow: 0 0 0 3px rgba(183, 146, 42, 0.18);
 }
 
 .input-cell::placeholder {
@@ -1455,7 +1450,7 @@ td.total-row {
 .terms-editor:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(61, 90, 72, 0.12);
+  box-shadow: 0 0 0 3px rgba(183, 146, 42, 0.18);
 }
 
 /* ── Badges ── */
@@ -1540,7 +1535,7 @@ td.total-row {
 
 .channel-summary-card.active:not(:disabled):hover {
   border-color: var(--accent-soft);
-  box-shadow: 0 4px 14px rgba(61, 90, 72, 0.08);
+  box-shadow: 0 4px 14px rgba(183, 146, 42, 0.12);
 }
 
 .channel-summary-card.active {
@@ -1550,7 +1545,7 @@ td.total-row {
 
 .channel-summary-card.selected {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(61, 90, 72, 0.15);
+  box-shadow: 0 0 0 3px rgba(183, 146, 42, 0.20);
 }
 
 .sales-channel-grid {

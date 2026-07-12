@@ -9,9 +9,12 @@
     <title>Barle · 영업 관리</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet" />
     <script>
       (function () {
-        window.APP_BUILD = "2026-07-09-v63";
+        window.APP_BUILD = "2026-07-09-v64";
         window.ASSET_V = window.APP_BUILD;
         var key = "barle-app-build";
         var saved = localStorage.getItem(key);
@@ -49,8 +52,8 @@
   <body>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-logo sidebar-logo-btn" id="btn-sidebar-home" role="button" tabindex="0" aria-label="홈으로">
-        <div class="logo-mark">Barle</div>
-        <div>
+        <div class="logo-wordmark">Barle</div>
+        <div class="sidebar-logo-sub">
           <h1>영업 관리</h1>
           <span>barle.co.kr</span>
         </div>
@@ -127,7 +130,7 @@
 
       <div class="sidebar-help">
         <p><strong>입력 안내</strong></p>
-        <p>노란 칸은 직접 입력, 연두 칸은 자동 계산됩니다.</p>
+        <p>노란 칸은 직접 입력, 파란 칸은 자동 계산됩니다.</p>
         <p class="app-version" id="app-version-label">버전 확인 중…</p>
       </div>
     </aside>
@@ -216,11 +219,11 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
-    <script src="js/data.js?v=63"></script>
-    <script src="js/store.js?v=63"></script>
-    <script src="js/poimport.js?v=63"></script>
-    <script src="js/app.js?v=63"></script>
-    <script src="js/proposal-pdf.js?v=63"></script>
-    <script src="js/excel.js?v=63"></script>
+    <script src="js/data.js?v=64"></script>
+    <script src="js/store.js?v=64"></script>
+    <script src="js/poimport.js?v=64"></script>
+    <script src="js/app.js?v=64"></script>
+    <script src="js/proposal-pdf.js?v=64"></script>
+    <script src="js/excel.js?v=64"></script>
   </body>
 </html>
