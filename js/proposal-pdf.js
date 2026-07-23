@@ -103,7 +103,7 @@ function buildProposalItemSnapshot(product, item, proposal, channel, fobUsd, fob
     srpUsd: item.srpUsd,
     msrpKrw: product.msrpKrw,
     mappKrw: product.mappKrw,
-    fobRate: proposal.fobRate,
+    fobRate: getEffectiveFobRatePercent(item, product),
     fobUsd,
     fobKrw,
     poQty,

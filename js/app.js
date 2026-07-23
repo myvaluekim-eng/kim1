@@ -177,6 +177,7 @@ function initProposalState(channelId) {
       srpKrw: p.srpKrw ?? null,
       srpUsd: p.srpUsd ?? null,
       poQty: 0,
+      fobRateOverride: null,
     };
   });
 }
@@ -207,6 +208,12 @@ function calcFobFromSrp(srpKrw, srpUsd, fobRatePercent, exchangeRate) {
   return { fobUsd, fobKrw, hasSrp: true };
 }
 
+function getEffectiveFobRatePercent(item, product) {
+  if (item.fobRateOverride != null) return item.fobRateOverride;
+  if (product.fobRate != null) return Math.round(product.fobRate * 1000) / 10;
+  return proposalState.fobRate;
+}
+
 function calcCtn(poQty, cartonQty) {
   return cartonQty > 0 ? poQty / cartonQty : 0;
 }
@@ -227,11 +234,11 @@ function computeEstimateTotals(products) {
   let totalCtn = 0;
   let totalCbm = 0;
   products.forEach((p) => {
-    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
     const { fobUsd, fobKrw } = calcFobFromSrp(
       item.srpKrw,
       item.srpUsd,
-      proposalState.fobRate,
+      getEffectiveFobRatePercent(item, p),
       proposalState.exchangeRate
     );
     const ctn = calcCtn(item.poQty, p.cartonQty);
@@ -884,11 +891,12 @@ function renderProposal() {
   const channelClients = getClients(appData, proposalState.channelId);
 
   const rows = products.map((p) => {
-    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
+    const effectiveFobRate = getEffectiveFobRatePercent(item, p);
     const { fobUsd, fobKrw } = calcFobFromSrp(
       item.srpKrw,
       item.srpUsd,
-      proposalState.fobRate,
+      effectiveFobRate,
       proposalState.exchangeRate
     );
 
@@ -902,7 +910,10 @@ function renderProposal() {
         <td>${p.size}</td>
         <td>${p.shelfLife ?? "—"}</td>
         <td>${p.srpKrw != null ? formatKrw(p.srpKrw) : "—"}</td>
-        <td>${p.fobRate != null ? Math.round(p.fobRate * 1000) / 10 + "%" : "—"}</td>
+        <td class="editable">
+          <input class="input-cell" type="number" step="0.1" min="0" max="100"
+            data-field="fobRateOverride" data-code="${p.code}" value="${effectiveFobRate}">
+        </td>
         <td class="auto" data-fob="${p.code}">${proposalState.currency === "KRW" ? formatKrw(fobKrw) : formatUsd(fobUsd)}</td>
         <td>${p.msrpKrw != null ? formatKrw(p.msrpKrw) : "—"}</td>
         <td>${p.mappKrw != null ? formatKrw(p.mappKrw) : "—"}</td>
@@ -921,11 +932,11 @@ function renderProposal() {
   }).join("");
 
   const estimateRows = products.map((p) => {
-    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
     const { fobUsd, fobKrw } = calcFobFromSrp(
       item.srpKrw,
       item.srpUsd,
-      proposalState.fobRate,
+      getEffectiveFobRatePercent(item, p),
       proposalState.exchangeRate
     );
     const ctn = calcCtn(item.poQty, p.cartonQty);
@@ -1047,7 +1058,7 @@ function renderProposal() {
               <th>Size</th>
               <th>Shelf Life</th>
               <th>SRP (₩)</th>
-              <th>FOB Rate (%)</th>
+              <th class="col-editable">FOB Rate (%)</th>
               <th class="col-auto">FOB (${proposalState.currency === "KRW" ? "₩" : "$"})</th>
               <th>MSRP (₩)</th>
               <th>MAPP (₩)</th>
@@ -1172,6 +1183,14 @@ function bindProposalEvents() {
     render();
   });
 
+  document.querySelectorAll('#proposal-table input[data-field="fobRateOverride"]').forEach((input) => {
+    input.addEventListener("input", (e) => {
+      const code = e.target.dataset.code;
+      proposalState.items[code].fobRateOverride = parseOptionalNumber(e.target.value);
+      updateProposalCalcs(channel);
+    });
+  });
+
   document.getElementById("btn-toggle-estimate").addEventListener("click", () => {
     estimatePanelOpen = !estimatePanelOpen;
     render();
@@ -1199,11 +1218,11 @@ function bindProposalEvents() {
     const products = getProducts(appData);
     const terms = getChannelTerms(appData, proposalState.channelId);
     const items = products.map((p) => {
-      const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+      const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
       const { fobUsd, fobKrw } = calcFobFromSrp(
         item.srpKrw,
         item.srpUsd,
-        proposalState.fobRate,
+        getEffectiveFobRatePercent(item, p),
         proposalState.exchangeRate
       );
       return buildProposalItemSnapshot(p, item, proposalState, channel, fobUsd, fobKrw);
@@ -1246,7 +1265,7 @@ function bindProposalEvents() {
       const { fobUsd, fobKrw } = calcFobFromSrp(
         item.srpKrw,
         item.srpUsd,
-        proposalState.fobRate,
+        getEffectiveFobRatePercent(item, p),
         proposalState.exchangeRate
       );
       return buildProposalItemSnapshot(p, item, proposalState, channel, fobUsd, fobKrw);
@@ -1280,11 +1299,11 @@ function bindProposalEvents() {
       const products = getProducts(appData);
       const terms = getChannelTerms(appData, proposalState.channelId);
       const items = products.map((p) => {
-        const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+        const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
         const { fobUsd, fobKrw } = calcFobFromSrp(
           item.srpKrw,
           item.srpUsd,
-          proposalState.fobRate,
+          getEffectiveFobRatePercent(item, p),
           proposalState.exchangeRate
         );
         return buildProposalItemSnapshot(p, item, proposalState, channel, fobUsd, fobKrw);
@@ -1313,11 +1332,11 @@ function bindProposalEvents() {
 function updateProposalCalcs(channel) {
   const products = getProducts(appData);
   products.forEach((p) => {
-    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
     const { fobUsd, fobKrw } = calcFobFromSrp(
       item.srpKrw,
       item.srpUsd,
-      proposalState.fobRate,
+      getEffectiveFobRatePercent(item, p),
       proposalState.exchangeRate
     );
     const fobEl = document.querySelector(`[data-fob="${p.code}"]`);
@@ -1330,11 +1349,11 @@ function updateProposalCalcs(channel) {
 function updateEstimateCalcs(channel) {
   const products = getProducts(appData);
   products.forEach((p) => {
-    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0 };
+    const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
     const { fobUsd, fobKrw } = calcFobFromSrp(
       item.srpKrw,
       item.srpUsd,
-      proposalState.fobRate,
+      getEffectiveFobRatePercent(item, p),
       proposalState.exchangeRate
     );
     const ctn = calcCtn(item.poQty, p.cartonQty);
