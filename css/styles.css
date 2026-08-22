@@ -2136,6 +2136,111 @@ td.total-row {
   opacity: 0.85;
 }
 
+.sidebar-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--sidebar-border);
+}
+
+.sidebar-account-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.sidebar-account-logout {
+  border: 1px solid var(--input-border);
+  background: #fff;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sidebar-account-logout:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+/* ── Login ── */
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, var(--bg) 0%, var(--bg-soft) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.login-overlay[hidden] {
+  display: none;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 380px;
+  padding: 36px 32px 32px;
+  animation: modalIn 0.2s ease;
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.login-logo span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.login-title {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 20px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-form .form-group input {
+  width: 100%;
+}
+
+.login-error {
+  font-size: 13px;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
 .master-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
