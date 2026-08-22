@@ -1,8 +1,8 @@
 // 직원 로그인 게이트 — 백엔드 서버가 없는 정적 사이트라 클라이언트에서 비밀번호를 확인합니다.
-// 새 직원을 추가하려면: 브라우저 콘솔에서 authHash("비밀번호") 실행 후 나온 값을 passHash에 넣으세요.
+// 새 직원을 추가/변경하려면: 브라우저 콘솔에서 authHash("비밀번호") 실행 후 나온 값을 passHash에 넣으세요.
+// 주의: 실제 비밀번호는 절대 이 파일에 평문으로 적지 마세요 (공개 저장소에 그대로 노출됩니다).
 const EMPLOYEES = [
-  // { id: "kim", name: "김OO", passHash: authHash("실제비밀번호")의 결과값 }
-  { id: "admin", name: "관리자", passHash: "76109db26e7daea0c1262e81a64438820f3b3348a31f43303952cec2d9a606fc" }, // 초기 비밀번호: barle2026
+  { id: "admin", name: "관리자", passHash: "38fdc8a2033bbd878fa5cea6bc0e1c8e4cd09017821efbda0c70a50340e9160c" },
 ];
 
 const AUTH_SESSION_KEY = "barle-auth-session";
