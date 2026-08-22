@@ -1,98 +1,249 @@
-// 직원 로그인 게이트 — 백엔드 서버가 없는 정적 사이트라 클라이언트에서 비밀번호를 확인합니다.
-// 새 직원을 추가/변경하려면: 브라우저 콘솔에서 authHash("비밀번호") 실행 후 나온 값을 passHash에 넣으세요.
-// 주의: 실제 비밀번호는 절대 이 파일에 평문으로 적지 마세요 (공개 저장소에 그대로 노출됩니다).
-const EMPLOYEES = [
-  { id: "admin", name: "관리자", passHash: "38fdc8a2033bbd878fa5cea6bc0e1c8e4cd09017821efbda0c70a50340e9160c" },
-];
+// 직원 로그인/회원가입 게이트 — Firebase Authentication + Firestore 사용.
+// 회원가입하면 Firestore employees/{uid} 문서가 status:"pending" 으로 생성되고,
+// 관리자(ADMIN_UID)가 승인해야 status:"approved" 로 바뀌어 로그인이 가능해집니다.
+//
+// 관리자 지정 방법: 관리자 계정으로 먼저 회원가입 → Firebase 콘솔(Authentication)에서
+// 해당 계정의 UID를 복사 → 아래 ADMIN_UID 값에 붙여넣기 → Firestore에서 그 문서의
+// status를 approved로 직접 수정 (최초 1회만 콘솔에서 수동으로 승인해야 합니다).
+const ADMIN_UID = "cl5X9kBKolYSJferSoU00CIKvHB3";
 
-const AUTH_SESSION_KEY = "barle-auth-session";
+firebase.initializeApp(window.firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-async function authHash(text) {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+function idToEmail(id) {
+  return id.trim().toLowerCase() + "@barle.local";
 }
-window.authHash = authHash;
 
-function getSession() {
-  try {
-    const raw = localStorage.getItem(AUTH_SESSION_KEY);
-    if (!raw) return null;
-    const session = JSON.parse(raw);
-    const employee = EMPLOYEES.find((e) => e.id === session.id);
-    if (!employee || employee.passHash !== session.passHash) return null;
-    return employee;
-  } catch (_) {
-    return null;
+const AUTH_ERROR_MESSAGES = {
+  "auth/email-already-in-use": "이미 사용 중인 아이디입니다.",
+  "auth/weak-password": "비밀번호는 6자 이상이어야 합니다.",
+  "auth/invalid-email": "아이디에 사용할 수 없는 문자가 포함되어 있습니다.",
+  "auth/user-not-found": "아이디 또는 비밀번호가 올바르지 않습니다.",
+  "auth/wrong-password": "아이디 또는 비밀번호가 올바르지 않습니다.",
+  "auth/invalid-credential": "아이디 또는 비밀번호가 올바르지 않습니다.",
+  "auth/too-many-requests": "너무 많이 시도했습니다. 잠시 후 다시 시도해주세요.",
+};
+
+function authErrorMessage(error) {
+  return AUTH_ERROR_MESSAGES[error.code] || "오류가 발생했습니다: " + error.message;
+}
+
+let employeeDocUnsub = null;
+let pendingListUnsub = null;
+
+function els() {
+  return {
+    overlay: document.getElementById("login-overlay"),
+    tabs: document.getElementById("login-tabs"),
+    viewLogin: document.getElementById("auth-view-login"),
+    viewSignup: document.getElementById("auth-view-signup"),
+    viewPending: document.getElementById("auth-view-pending"),
+    loginForm: document.getElementById("login-form"),
+    loginError: document.getElementById("login-error"),
+    signupForm: document.getElementById("signup-form"),
+    signupError: document.getElementById("signup-error"),
+  };
+}
+
+function setMode(mode) {
+  const { viewLogin, viewSignup, viewPending, tabs } = els();
+  viewLogin.hidden = mode !== "login";
+  viewSignup.hidden = mode !== "signup";
+  viewPending.hidden = mode !== "pending";
+  if (tabs) {
+    tabs.hidden = mode === "pending";
+    tabs.querySelectorAll(".login-tab").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.mode === mode);
+    });
   }
-}
-
-function setSession(employee) {
-  localStorage.setItem(
-    AUTH_SESSION_KEY,
-    JSON.stringify({ id: employee.id, passHash: employee.passHash })
-  );
-}
-
-function clearSession() {
-  localStorage.removeItem(AUTH_SESSION_KEY);
-}
-
-function showApp(employee) {
-  document.body.classList.add("authed");
-  const overlay = document.getElementById("login-overlay");
-  if (overlay) overlay.hidden = true;
-  const label = document.getElementById("current-employee-name");
-  if (label) label.textContent = employee.name || employee.id;
 }
 
 function showLogin() {
   document.body.classList.remove("authed");
-  const overlay = document.getElementById("login-overlay");
-  if (overlay) overlay.hidden = false;
-  document.getElementById("login-id")?.focus();
+  els().overlay.hidden = false;
+  setMode("login");
+}
+
+function showPending() {
+  document.body.classList.remove("authed");
+  els().overlay.hidden = false;
+  setMode("pending");
+}
+
+function showApp(profile) {
+  document.body.classList.add("authed");
+  els().overlay.hidden = true;
+  document.getElementById("current-employee-name").textContent = profile.name || profile.id;
+  document.getElementById("current-employee-position").textContent = profile.position || "";
+  document.getElementById("btn-open-approval").hidden = auth.currentUser?.uid !== ADMIN_UID;
+}
+
+function setupTabs() {
+  document.getElementById("login-tabs")?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".login-tab");
+    if (!btn) return;
+    els().loginError.hidden = true;
+    els().signupError.hidden = true;
+    setMode(btn.dataset.mode);
+  });
 }
 
 function setupLoginForm() {
-  const form = document.getElementById("login-form");
+  const form = els().loginForm;
   if (!form) return;
-  const errorEl = document.getElementById("login-error");
-
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    const errorEl = els().loginError;
     errorEl.hidden = true;
     const id = form.elements.employeeId.value.trim();
     const password = form.elements.password.value;
-    const employee = EMPLOYEES.find((emp) => emp.id === id);
-    const hash = await authHash(password);
-
-    if (employee && employee.passHash === hash) {
-      setSession(employee);
+    try {
+      await auth.signInWithEmailAndPassword(idToEmail(id), password);
       form.reset();
-      showApp(employee);
-    } else {
-      errorEl.textContent = "아이디 또는 비밀번호가 올바르지 않습니다.";
+    } catch (error) {
+      errorEl.textContent = authErrorMessage(error);
       errorEl.hidden = false;
       form.elements.password.value = "";
-      form.elements.password.focus();
     }
   });
+}
 
-  document.getElementById("btn-logout")?.addEventListener("click", () => {
-    clearSession();
-    showLogin();
+function setupSignupForm() {
+  const form = els().signupForm;
+  if (!form) return;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = els().signupError;
+    errorEl.hidden = true;
+    const id = form.elements.employeeId.value.trim();
+    const password = form.elements.password.value;
+    const name = form.elements.name.value.trim();
+    const position = form.elements.position.value.trim();
+
+    if (!id || !password || !name || !position) return;
+
+    try {
+      const cred = await auth.createUserWithEmailAndPassword(idToEmail(id), password);
+      await db.collection("employees").doc(cred.user.uid).set({
+        id,
+        name,
+        position,
+        status: "pending",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      await auth.signOut();
+      form.reset();
+      setMode("login");
+      const loginError = els().loginError;
+      loginError.textContent = "가입 신청이 완료되었습니다. 관리자 승인 후 로그인해주세요.";
+      loginError.classList.add("login-success");
+      loginError.hidden = false;
+    } catch (error) {
+      errorEl.textContent = authErrorMessage(error);
+      errorEl.hidden = false;
+    }
+  });
+}
+
+function setupLogout() {
+  const doLogout = () => auth.signOut();
+  document.getElementById("btn-logout")?.addEventListener("click", doLogout);
+  document.getElementById("btn-pending-logout")?.addEventListener("click", doLogout);
+}
+
+function renderApprovalItem(docSnap) {
+  const data = docSnap.data();
+  const item = document.createElement("div");
+  item.className = "approval-item";
+  item.innerHTML = `
+    <div class="approval-item-info">
+      <strong>${data.name}</strong>
+      <span>${data.position} · ${data.id}</span>
+    </div>
+    <div class="approval-item-actions">
+      <button type="button" class="btn btn-secondary approval-reject">거절</button>
+      <button type="button" class="btn btn-primary approval-approve">승인</button>
+    </div>
+  `;
+  item.querySelector(".approval-approve").addEventListener("click", async () => {
+    await db.collection("employees").doc(docSnap.id).update({ status: "approved" });
+  });
+  item.querySelector(".approval-reject").addEventListener("click", async () => {
+    await db.collection("employees").doc(docSnap.id).update({ status: "rejected" });
+  });
+  return item;
+}
+
+function setupApprovalPanel() {
+  const overlay = document.getElementById("approval-overlay");
+  const list = document.getElementById("approval-list");
+
+  document.getElementById("btn-open-approval")?.addEventListener("click", () => {
+    overlay.hidden = false;
+    pendingListUnsub = db
+      .collection("employees")
+      .where("status", "==", "pending")
+      .onSnapshot((snapshot) => {
+        list.innerHTML = "";
+        if (snapshot.empty) {
+          list.innerHTML = '<p class="approval-empty">승인 대기중인 가입 신청이 없습니다.</p>';
+          return;
+        }
+        snapshot.forEach((docSnap) => list.appendChild(renderApprovalItem(docSnap)));
+      });
+  });
+
+  document.getElementById("approval-close")?.addEventListener("click", () => {
+    overlay.hidden = true;
+    if (pendingListUnsub) {
+      pendingListUnsub();
+      pendingListUnsub = null;
+    }
   });
 }
 
 function initAuth() {
+  setupTabs();
   setupLoginForm();
-  const employee = getSession();
-  if (employee) {
-    showApp(employee);
-  } else {
-    showLogin();
-  }
+  setupSignupForm();
+  setupLogout();
+  setupApprovalPanel();
+
+  auth.onAuthStateChanged((user) => {
+    if (employeeDocUnsub) {
+      employeeDocUnsub();
+      employeeDocUnsub = null;
+    }
+
+    if (!user) {
+      showLogin();
+      return;
+    }
+
+    employeeDocUnsub = db
+      .collection("employees")
+      .doc(user.uid)
+      .onSnapshot((docSnap) => {
+        if (!docSnap.exists) {
+          showLogin();
+          auth.signOut();
+          return;
+        }
+        const data = docSnap.data();
+        if (data.status === "approved") {
+          showApp(data);
+        } else if (data.status === "pending") {
+          showPending();
+        } else {
+          showLogin();
+          const loginError = els().loginError;
+          loginError.textContent = "가입이 거절된 계정입니다. 관리자에게 문의해주세요.";
+          loginError.hidden = false;
+          auth.signOut();
+        }
+      });
+  });
 }
 
 if (document.readyState === "loading") {

@@ -2145,13 +2145,33 @@ td.total-row {
   border-top: 1px solid var(--sidebar-border);
 }
 
+.sidebar-account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .sidebar-account-name {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
-.sidebar-account-logout {
+.sidebar-account-position {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sidebar-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sidebar-account-logout,
+.sidebar-account-approve {
   border: 1px solid var(--input-border);
   background: #fff;
   color: var(--text-muted);
@@ -2161,12 +2181,20 @@ td.total-row {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
 }
 
-.sidebar-account-logout:hover {
+.sidebar-account-logout:hover,
+.sidebar-account-approve:hover {
   border-color: var(--primary);
   color: var(--primary);
   background: var(--primary-light);
+}
+
+.sidebar-account-approve {
+  border-color: var(--accent-soft);
+  color: var(--primary-hover);
+  background: var(--accent-light);
 }
 
 /* ── Login ── */
@@ -2208,12 +2236,32 @@ td.total-row {
   letter-spacing: 0.02em;
 }
 
-.login-title {
-  text-align: center;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
+.login-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-soft);
+  border-radius: 10px;
+  padding: 4px;
   margin-bottom: 20px;
+}
+
+.login-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.login-tab.active {
+  background: #fff;
+  color: var(--primary);
+  box-shadow: var(--shadow);
 }
 
 .login-form {
@@ -2226,6 +2274,12 @@ td.total-row {
   width: 100%;
 }
 
+.login-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: -8px 0 0;
+}
+
 .login-error {
   font-size: 13px;
   color: #dc2626;
@@ -2236,9 +2290,104 @@ td.total-row {
   margin: 0;
 }
 
+.login-error.login-success {
+  color: #15803d;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
 .login-submit {
   width: 100%;
   margin-top: 4px;
+}
+
+.login-pending {
+  text-align: center;
+  padding: 12px 0 4px;
+}
+
+.login-pending-icon {
+  font-size: 36px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.login-pending h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.login-pending p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+/* ── Approval panel ── */
+.approval-modal {
+  max-width: 480px;
+}
+
+.approval-body {
+  padding: 20px 24px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.approval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.approval-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 20px 0;
+}
+
+.approval-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+}
+
+.approval-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.approval-item-info strong {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.approval-item-info span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.approval-item-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.approval-item-actions .btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  height: auto;
 }
 
 .master-layout {

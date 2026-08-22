@@ -20,7 +20,7 @@
     </style>
     <script>
       (function () {
-        window.APP_BUILD = "2026-08-22-v68";
+        window.APP_BUILD = "2026-08-22-v69";
         window.ASSET_V = window.APP_BUILD;
         var key = "barle-app-build";
         var saved = localStorage.getItem(key);
@@ -141,8 +141,14 @@
       </div>
 
       <div class="sidebar-account">
-        <span class="sidebar-account-name"><span id="current-employee-name"></span>님</span>
-        <button type="button" class="sidebar-account-logout" id="btn-logout">로그아웃</button>
+        <div class="sidebar-account-info">
+          <span class="sidebar-account-name"><span id="current-employee-name"></span>님</span>
+          <span class="sidebar-account-position" id="current-employee-position"></span>
+        </div>
+        <div class="sidebar-account-actions">
+          <button type="button" class="sidebar-account-approve" id="btn-open-approval" hidden>가입 승인</button>
+          <button type="button" class="sidebar-account-logout" id="btn-logout">로그아웃</button>
+        </div>
       </div>
     </aside>
 
@@ -178,19 +184,77 @@
           <div class="logo-wordmark">Barle</div>
           <span>barle.co.kr · 영업 관리</span>
         </div>
-        <h3 class="login-title">직원 로그인</h3>
-        <form id="login-form" class="login-form">
-          <div class="form-group">
-            <label for="login-id">아이디</label>
-            <input type="text" id="login-id" name="employeeId" autocomplete="username" required autofocus />
+
+        <div class="login-tabs" id="login-tabs">
+          <button type="button" class="login-tab active" data-mode="login">로그인</button>
+          <button type="button" class="login-tab" data-mode="signup">회원가입</button>
+        </div>
+
+        <div id="auth-view-login">
+          <form id="login-form" class="login-form">
+            <div class="form-group">
+              <label for="login-id">아이디</label>
+              <input type="text" id="login-id" name="employeeId" autocomplete="username" required autofocus />
+            </div>
+            <div class="form-group">
+              <label for="login-password">비밀번호</label>
+              <input type="password" id="login-password" name="password" autocomplete="current-password" required />
+            </div>
+            <p class="login-error" id="login-error" hidden></p>
+            <button type="submit" class="btn btn-primary btn-lg login-submit">로그인</button>
+          </form>
+        </div>
+
+        <div id="auth-view-signup" hidden>
+          <form id="signup-form" class="login-form">
+            <div class="form-group">
+              <label for="signup-id">아이디</label>
+              <input type="text" id="signup-id" name="employeeId" autocomplete="username" required />
+            </div>
+            <div class="form-group">
+              <label for="signup-password">비밀번호</label>
+              <input type="password" id="signup-password" name="password" autocomplete="new-password" minlength="6" required />
+            </div>
+            <div class="form-group">
+              <label for="signup-name">이름</label>
+              <input type="text" id="signup-name" name="name" required />
+            </div>
+            <div class="form-group">
+              <label for="signup-position">직급</label>
+              <input type="text" id="signup-position" name="position" placeholder="예: 사원, 대리, 팀장" required />
+            </div>
+            <p class="login-hint">비밀번호는 6자 이상이어야 합니다. 가입 신청 후 관리자 승인이 필요합니다.</p>
+            <p class="login-error" id="signup-error" hidden></p>
+            <button type="submit" class="btn btn-primary btn-lg login-submit">가입 신청</button>
+          </form>
+        </div>
+
+        <div id="auth-view-pending" hidden>
+          <div class="login-pending">
+            <span class="login-pending-icon">⏳</span>
+            <h4>관리자 승인 대기중입니다</h4>
+            <p>가입 신청이 접수되었습니다. 관리자가 승인하면 자동으로 접속됩니다.</p>
+            <button type="button" class="btn btn-secondary btn-lg" id="btn-pending-logout">다른 계정으로 로그인</button>
           </div>
-          <div class="form-group">
-            <label for="login-password">비밀번호</label>
-            <input type="password" id="login-password" name="password" autocomplete="current-password" required />
+        </div>
+      </div>
+    </div>
+
+    <div class="confirm-overlay" id="approval-overlay" hidden>
+      <div class="confirm-modal approval-modal" role="dialog" aria-modal="true" aria-labelledby="approval-title">
+        <div class="confirm-header">
+          <span class="confirm-icon">✅</span>
+          <div>
+            <p class="confirm-label">계정 관리</p>
+            <h3 class="confirm-title" id="approval-title">직원 가입 승인</h3>
           </div>
-          <p class="login-error" id="login-error" hidden></p>
-          <button type="submit" class="btn btn-primary btn-lg login-submit">로그인</button>
-        </form>
+        </div>
+        <div class="confirm-body approval-body">
+          <div id="approval-list" class="approval-list"></div>
+        </div>
+        <div class="confirm-actions">
+          <button type="button" class="btn btn-secondary btn-lg" id="approval-close">닫기</button>
+        </div>
       </div>
     </div>
 
@@ -252,12 +316,16 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
-    <script src="js/auth.js?v=68"></script>
-    <script src="js/data.js?v=68"></script>
-    <script src="js/store.js?v=68"></script>
-    <script src="js/poimport.js?v=68"></script>
-    <script src="js/app.js?v=68"></script>
-    <script src="js/proposal-pdf.js?v=68"></script>
-    <script src="js/excel.js?v=68"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-config.js?v=69"></script>
+    <script src="js/auth.js?v=69"></script>
+    <script src="js/data.js?v=69"></script>
+    <script src="js/store.js?v=69"></script>
+    <script src="js/poimport.js?v=69"></script>
+    <script src="js/app.js?v=69"></script>
+    <script src="js/proposal-pdf.js?v=69"></script>
+    <script src="js/excel.js?v=69"></script>
   </body>
 </html>
