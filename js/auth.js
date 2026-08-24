@@ -152,6 +152,59 @@ function setupLogout() {
   document.getElementById("btn-pending-logout")?.addEventListener("click", doLogout);
 }
 
+function setupPasswordChange() {
+  const overlay = document.getElementById("password-overlay");
+  const form = document.getElementById("password-form");
+  const errorEl = document.getElementById("password-error");
+  if (!overlay || !form) return;
+
+  const closeModal = () => {
+    overlay.hidden = true;
+    form.reset();
+    errorEl.hidden = true;
+    errorEl.classList.remove("login-success");
+  };
+
+  document.getElementById("btn-open-password")?.addEventListener("click", () => {
+    overlay.hidden = false;
+  });
+  document.getElementById("password-cancel")?.addEventListener("click", closeModal);
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorEl.hidden = true;
+    errorEl.classList.remove("login-success");
+
+    const currentPassword = form.elements.currentPassword.value;
+    const newPassword = form.elements.newPassword.value;
+    const confirmPassword = form.elements.confirmPassword.value;
+
+    if (newPassword !== confirmPassword) {
+      errorEl.textContent = "새 비밀번호가 일치하지 않습니다.";
+      errorEl.hidden = false;
+      return;
+    }
+
+    try {
+      const user = auth.currentUser;
+      const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPassword);
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
+      errorEl.textContent = "비밀번호가 변경되었습니다.";
+      errorEl.classList.add("login-success");
+      errorEl.hidden = false;
+      form.reset();
+      setTimeout(closeModal, 1200);
+    } catch (error) {
+      errorEl.textContent =
+        error.code === "auth/wrong-password" || error.code === "auth/invalid-credential"
+          ? "현재 비밀번호가 올바르지 않습니다."
+          : authErrorMessage(error);
+      errorEl.hidden = false;
+    }
+  });
+}
+
 function renderApprovalItem(docSnap) {
   const data = docSnap.data();
   const item = document.createElement("div");
@@ -209,6 +262,7 @@ function initAuth() {
   setupSignupForm();
   setupLogout();
   setupApprovalPanel();
+  setupPasswordChange();
 
   auth.onAuthStateChanged((user) => {
     if (employeeDocUnsub) {

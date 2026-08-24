@@ -20,7 +20,7 @@
     </style>
     <script>
       (function () {
-        window.APP_BUILD = "2026-08-22-v69";
+        window.APP_BUILD = "2026-08-22-v70";
         window.ASSET_V = window.APP_BUILD;
         var key = "barle-app-build";
         var saved = localStorage.getItem(key);
@@ -147,6 +147,7 @@
         </div>
         <div class="sidebar-account-actions">
           <button type="button" class="sidebar-account-approve" id="btn-open-approval" hidden>가입 승인</button>
+          <button type="button" class="sidebar-account-approve" id="btn-open-password">비밀번호 변경</button>
           <button type="button" class="sidebar-account-logout" id="btn-logout">로그아웃</button>
         </div>
       </div>
@@ -258,6 +259,37 @@
       </div>
     </div>
 
+    <div class="confirm-overlay" id="password-overlay" hidden>
+      <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="password-title">
+        <div class="confirm-header">
+          <span class="confirm-icon">🔒</span>
+          <div>
+            <p class="confirm-label">계정 관리</p>
+            <h3 class="confirm-title" id="password-title">비밀번호 변경</h3>
+          </div>
+        </div>
+        <form id="password-form" class="confirm-body login-form">
+          <div class="form-group">
+            <label for="password-current">현재 비밀번호</label>
+            <input type="password" id="password-current" name="currentPassword" autocomplete="current-password" required />
+          </div>
+          <div class="form-group">
+            <label for="password-new">새 비밀번호</label>
+            <input type="password" id="password-new" name="newPassword" autocomplete="new-password" minlength="6" required />
+          </div>
+          <div class="form-group">
+            <label for="password-confirm">새 비밀번호 확인</label>
+            <input type="password" id="password-confirm" name="confirmPassword" autocomplete="new-password" minlength="6" required />
+          </div>
+          <p class="login-error" id="password-error" hidden></p>
+          <div class="confirm-actions">
+            <button type="button" class="btn btn-secondary btn-lg" id="password-cancel">취소</button>
+            <button type="submit" class="btn btn-primary btn-lg">변경하기</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="confirm-overlay" id="confirm-overlay" hidden>
       <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
         <div class="confirm-header" id="confirm-header">
@@ -319,13 +351,13 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="js/firebase-config.js?v=69"></script>
-    <script src="js/auth.js?v=69"></script>
-    <script src="js/data.js?v=69"></script>
-    <script src="js/store.js?v=69"></script>
-    <script src="js/poimport.js?v=69"></script>
-    <script src="js/app.js?v=69"></script>
-    <script src="js/proposal-pdf.js?v=69"></script>
-    <script src="js/excel.js?v=69"></script>
+    <script src="js/firebase-config.js?v=70"></script>
+    <script src="js/auth.js?v=70"></script>
+    <script src="js/data.js?v=70"></script>
+    <script src="js/store.js?v=70"></script>
+    <script src="js/poimport.js?v=70"></script>
+    <script src="js/app.js?v=70"></script>
+    <script src="js/proposal-pdf.js?v=70"></script>
+    <script src="js/excel.js?v=70"></script>
   </body>
 </html>
