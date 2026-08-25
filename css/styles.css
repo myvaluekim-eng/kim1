@@ -700,18 +700,6 @@ body {
   color: var(--text-secondary);
 }
 
-.product-select-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.product-select-actions .btn-compact {
-  height: 28px;
-  padding: 0 10px;
-  font-size: 12px;
-}
-
 .product-include-cell {
   text-align: center;
 }
@@ -1389,25 +1377,28 @@ tbody tr:hover {
   background: #fafbfc;
 }
 
-/* Freeze Category/Barcode/Product columns so product name stays visible on horizontal scroll */
+/* Freeze checkbox/Category/Barcode/Product columns so product name stays visible on horizontal scroll */
 #proposal-table th:nth-child(1),
-#proposal-table td:nth-child(1) { position: sticky; left: 0; z-index: 2; width: 90px; }
+#proposal-table td:nth-child(1) { position: sticky; left: 0; z-index: 2; width: 40px; }
 #proposal-table th:nth-child(2),
-#proposal-table td:nth-child(2) { position: sticky; left: 90px; z-index: 2; width: 120px; }
+#proposal-table td:nth-child(2) { position: sticky; left: 40px; z-index: 2; width: 90px; }
 #proposal-table th:nth-child(3),
-#proposal-table td:nth-child(3) { position: sticky; left: 210px; z-index: 2; width: 150px; }
+#proposal-table td:nth-child(3) { position: sticky; left: 130px; z-index: 2; width: 120px; }
 #proposal-table th:nth-child(4),
-#proposal-table td:nth-child(4) {
+#proposal-table td:nth-child(4) { position: sticky; left: 250px; z-index: 2; width: 150px; }
+#proposal-table th:nth-child(5),
+#proposal-table td:nth-child(5) {
   position: sticky;
-  left: 360px;
+  left: 400px;
   z-index: 2;
   width: 170px;
   box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
 }
 
-#proposal-table thead th:nth-child(-n + 4) { background: var(--bg-soft); z-index: 3; }
-#proposal-table tbody td:nth-child(-n + 4) { background: #fff; }
-#proposal-table tbody tr:hover td:nth-child(-n + 4) { background: #fafbfc; }
+#proposal-table thead th:nth-child(-n + 5) { background: var(--bg-soft); z-index: 3; }
+#proposal-table tbody td:nth-child(-n + 5) { background: #fff; }
+#proposal-table tbody tr:hover td:nth-child(-n + 5) { background: #fafbfc; }
+#proposal-table tbody tr.row-excluded td:nth-child(-n + 5) { background: var(--bg-soft); }
 
 td.editable {
   background: #fffdf5;

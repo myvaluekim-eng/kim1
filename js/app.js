@@ -894,11 +894,7 @@ function renderProposal() {
 
   const productSelectHtml = `
     <div class="product-select-toolbar no-print">
-      <span>포함할 제품: ${includedProducts.length}/${products.length} · 표 왼쪽 체크박스로 제품별 포함 여부를 선택하세요</span>
-      <div class="product-select-actions">
-        <button type="button" class="btn btn-secondary btn-compact" id="btn-select-all-products">전체 선택</button>
-        <button type="button" class="btn btn-secondary btn-compact" id="btn-select-none-products">전체 해제</button>
-      </div>
+      <span>포함할 제품: ${includedProducts.length}/${products.length} · 표 왼쪽 체크박스로 제품별 포함 여부를 선택하세요 (맨 위 체크박스는 전체 선택/해제)</span>
     </div>`;
 
   const rows = products.map((p) => {
@@ -1062,7 +1058,9 @@ function renderProposal() {
         <table id="proposal-table">
           <thead>
             <tr>
-              <th class="no-print"></th>
+              <th class="no-print product-include-cell">
+                <input type="checkbox" id="product-select-all" title="전체 선택/해제">
+              </th>
               <th>Category</th>
               <th>Barcode</th>
               <th>Product (KOR)</th>
@@ -1202,19 +1200,19 @@ function bindProposalEvents() {
     });
   });
 
-  document.getElementById("btn-select-all-products")?.addEventListener("click", () => {
-    Object.values(proposalState.items).forEach((item) => {
-      item.included = true;
+  const selectAllCheckbox = document.getElementById("product-select-all");
+  if (selectAllCheckbox) {
+    const itemValues = Object.values(proposalState.items);
+    const includedCount = itemValues.filter((item) => item.included !== false).length;
+    selectAllCheckbox.checked = itemValues.length > 0 && includedCount === itemValues.length;
+    selectAllCheckbox.indeterminate = includedCount > 0 && includedCount < itemValues.length;
+    selectAllCheckbox.addEventListener("change", (e) => {
+      Object.values(proposalState.items).forEach((item) => {
+        item.included = e.target.checked;
+      });
+      render();
     });
-    render();
-  });
-
-  document.getElementById("btn-select-none-products")?.addEventListener("click", () => {
-    Object.values(proposalState.items).forEach((item) => {
-      item.included = false;
-    });
-    render();
-  });
+  }
 
   document.querySelectorAll('#proposal-table input[data-field="fobRateOverride"]').forEach((input) => {
     input.addEventListener("input", (e) => {
