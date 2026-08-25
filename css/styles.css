@@ -2560,29 +2560,34 @@ td.total-row {
   margin-bottom: 4px;
 }
 
-/* ── Per-proposal terms preset select ── */
-.terms-box-header {
+/* ── Per-proposal terms preset tabs ── */
+.terms-preset-tabs {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
-.terms-box-header h4 {
-  margin-bottom: 0;
-}
-
-.terms-preset-select {
-  height: 36px;
-  padding: 0 12px;
+.terms-preset-tab {
+  height: 34px;
+  padding: 0 16px;
   border: 1px solid var(--primary);
-  border-radius: 8px;
+  border-radius: 20px;
   font-size: 13px;
   font-weight: 600;
   color: var(--primary-hover);
-  background: #fffdf5;
-  flex-shrink: 0;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.terms-preset-tab:hover {
+  background: var(--primary-light);
+}
+
+.terms-preset-tab.active {
+  background: var(--primary);
+  color: #fff;
 }
 
 .form-grid-full {
