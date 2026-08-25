@@ -338,43 +338,29 @@ function buildProposalDocumentHtml(proposal) {
 
 function buildDomesticEstimateDocumentHtml(proposal) {
   const items = getProposalDisplayItems(proposal).filter((item) => (item.poQty || 0) > 0);
-  const totalRowCount = 15;
+  const terms = proposal.terms || [];
 
-  const dataRows = items.map((item, i) => {
-    const amount = item.amount || 0;
-    const vat = Math.round(amount * 0.1);
-    const grandTotal = amount + vat;
-    const supplyRate = item.fobRate != null ? `${formatNumber(item.fobRate, 1)}%` : "—";
-    return `
+  const dataRows = items
+    .map((item, i) => {
+      const amount = item.amount || 0;
+      const vat = Math.round(amount * 0.1);
+      const grandTotal = amount + vat;
+      const supplyRate = item.fobRate != null ? `${formatNumber(item.fobRate, 1)}%` : "—";
+      return `
       <tr>
         <td class="num">${i + 1}</td>
         <td class="domestic-doc-product">${item.nameKor}</td>
         <td>${item.size || "—"}</td>
-        <td class="num editable-cell">${item.srpKrw != null ? formatKrw(item.srpKrw) : "—"}</td>
+        <td class="num">${item.srpKrw != null ? formatKrw(item.srpKrw) : "—"}</td>
         <td class="num">${supplyRate}</td>
         <td class="num">${item.fobKrw != null ? formatKrw(item.fobKrw) : "—"}</td>
-        <td class="num editable-cell">${item.poQty || 0}</td>
+        <td class="num">${item.poQty || 0}</td>
         <td class="num">${formatKrw(amount)}</td>
         <td class="num">${formatKrw(vat)}</td>
         <td class="num">${formatKrw(grandTotal)}</td>
       </tr>`;
-  });
-
-  for (let i = items.length; i < totalRowCount; i++) {
-    dataRows.push(`
-      <tr>
-        <td class="num">${i + 1}</td>
-        <td></td>
-        <td></td>
-        <td class="editable-cell"></td>
-        <td></td>
-        <td></td>
-        <td class="editable-cell"></td>
-        <td></td>
-        <td></td>
-        <td></td>
-      </tr>`);
-  }
+    })
+    .join("");
 
   const totalSupply = items.reduce((sum, item) => sum + (item.amount || 0), 0);
   const totalVat = Math.round(totalSupply * 0.1);
@@ -386,27 +372,15 @@ function buildDomesticEstimateDocumentHtml(proposal) {
       <table class="domestic-doc-meta">
         <tr>
           <td class="meta-label">공급자</td>
-          <td class="meta-value" colspan="2">Barle Cosmetics</td>
+          <td class="meta-value">Barle Cosmetics</td>
           <td class="meta-label">견적일</td>
-          <td class="meta-value meta-highlight">${proposal.poDate || "—"}</td>
-          <td class="meta-label">견적 유효기간</td>
-          <td class="meta-value">30일</td>
-        </tr>
-        <tr>
-          <td class="meta-label">담당자</td>
-          <td class="meta-value" colspan="2">${proposal.staffName || "—"}</td>
-          <td class="meta-label">연락처</td>
-          <td class="meta-value meta-highlight">${proposal.clientContact || "—"}</td>
-          <td class="meta-label">VAT 기준</td>
-          <td class="meta-value">별도</td>
+          <td class="meta-value">${proposal.poDate || "—"}</td>
         </tr>
         <tr>
           <td class="meta-label">거래처명</td>
-          <td class="meta-value" colspan="2">${proposal.clientName || "—"}</td>
-          <td class="meta-label">담당자</td>
-          <td class="meta-value meta-highlight"></td>
-          <td class="meta-label">결제조건</td>
-          <td class="meta-value">발주 시 100% 선입금</td>
+          <td class="meta-value">${proposal.clientName || "—"}</td>
+          <td class="meta-label">연락처</td>
+          <td class="meta-value">${proposal.clientContact || "—"}</td>
         </tr>
       </table>
 
@@ -426,7 +400,7 @@ function buildDomesticEstimateDocumentHtml(proposal) {
           </tr>
         </thead>
         <tbody>
-          ${dataRows.join("")}
+          ${dataRows}
         </tbody>
         <tfoot>
           <tr class="domestic-doc-total">
@@ -437,6 +411,16 @@ function buildDomesticEstimateDocumentHtml(proposal) {
           </tr>
         </tfoot>
       </table>
+
+      ${
+        terms.length
+          ? `
+      <div class="proposal-doc-terms">
+        <p class="proposal-doc-terms-title">거래 조건</p>
+        ${terms.map((t) => `<p>${t}</p>`).join("")}
+      </div>`
+          : ""
+      }
 
       <p class="proposal-doc-footer">Barle Cosmetics · barle.co.kr</p>
     </div>
