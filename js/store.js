@@ -24,16 +24,40 @@ function initChannelSrpForProduct(data, productCode) {
   });
 }
 
+function normalizeTermGroup(entry) {
+  if (typeof entry === "string") return { options: [entry], selected: 0 };
+  const options = Array.isArray(entry?.options) && entry.options.length ? entry.options : [""];
+  let selected = Number.isInteger(entry?.selected) ? entry.selected : 0;
+  if (selected < 0 || selected >= options.length) selected = 0;
+  return { options, selected };
+}
+
+function normalizeTermGroups(list) {
+  return (list || []).map(normalizeTermGroup);
+}
+
+function resolveChannelTerms(groups, selections = {}) {
+  return groups
+    .map((group, idx) => {
+      const override = selections[idx];
+      const optionIndex =
+        Number.isInteger(override) && override >= 0 && override < group.options.length
+          ? override
+          : group.selected;
+      return group.options[optionIndex] ?? group.options[0] ?? "";
+    })
+    .filter((text) => text.trim().length > 0);
+}
+
 function migrateChannels(data) {
   if (!data.channels || data.channels.length === 0) {
     data.channels = structuredClone(DEFAULT_CHANNELS);
   }
   if (!data.channelTerms) data.channelTerms = {};
   getChannels(data).forEach((ch) => {
-    if (!data.channelTerms[ch.id]) {
-      const def = DEFAULT_CHANNELS.find((d) => d.id === ch.id);
-      data.channelTerms[ch.id] = def ? [...def.terms] : [...(ch.terms || [])];
-    }
+    const def = DEFAULT_CHANNELS.find((d) => d.id === ch.id);
+    const existing = data.channelTerms[ch.id] ?? (def ? def.terms : ch.terms || []);
+    data.channelTerms[ch.id] = normalizeTermGroups(existing);
   });
 }
 
@@ -160,14 +184,15 @@ function deleteProduct(data, code) {
 }
 
 function getChannelTerms(data, channelId) {
-  return data.channelTerms?.[channelId] ?? DEFAULT_CHANNELS.find((c) => c.id === channelId)?.terms ?? [];
+  const groups = data.channelTerms?.[channelId] ?? DEFAULT_CHANNELS.find((c) => c.id === channelId)?.terms ?? [];
+  return normalizeTermGroups(groups);
 }
 
 function getDefaultChannelTerms(data, channelId) {
   const def = DEFAULT_CHANNELS.find((c) => c.id === channelId);
-  if (def) return [...def.terms];
+  if (def) return normalizeTermGroups(def.terms);
   const ch = getChannels(data).find((c) => c.id === channelId);
-  return ch?.terms ? [...ch.terms] : [];
+  return normalizeTermGroups(ch?.terms || []);
 }
 
 function generateChannelId(data, name) {
@@ -305,7 +330,7 @@ function getChannelUsage(data, channelId) {
 
 function setChannelTerms(data, channelId, terms) {
   if (!data.channelTerms) data.channelTerms = {};
-  data.channelTerms[channelId] = terms;
+  data.channelTerms[channelId] = normalizeTermGroups(terms);
   saveData(data);
 }
 

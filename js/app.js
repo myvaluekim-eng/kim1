@@ -110,6 +110,7 @@ let proposalState = {
   exchangeRate: DEFAULT_EXCHANGE_RATE,
   currency: "KRW",
   items: {},
+  termsSelections: {},
 };
 
 let productEditCode = null;
@@ -172,6 +173,7 @@ function initProposalState(channelId) {
   proposalState.exchangeRate = appData.exchangeRate || DEFAULT_EXCHANGE_RATE;
   proposalState.currency = "KRW";
   proposalState.items = {};
+  proposalState.termsSelections = {};
   getProducts(appData).forEach((p) => {
     proposalState.items[p.code] = {
       srpKrw: p.srpKrw ?? null,
@@ -181,6 +183,11 @@ function initProposalState(channelId) {
       included: true,
     };
   });
+}
+
+function getResolvedProposalTerms() {
+  const termGroups = getChannelTerms(appData, proposalState.channelId);
+  return resolveChannelTerms(termGroups, proposalState.termsSelections);
 }
 
 function parseOptionalNumber(value) {
@@ -889,7 +896,7 @@ function renderProposal() {
   const channel = getChannelList().find((c) => c.id === proposalState.channelId);
   const products = getProducts(appData);
   const includedProducts = products.filter((p) => proposalState.items[p.code]?.included !== false);
-  const terms = getChannelTerms(appData, proposalState.channelId);
+  const termGroups = getChannelTerms(appData, proposalState.channelId);
   const channelClients = getClients(appData, proposalState.channelId);
 
   const productSelectHtml = `
@@ -1128,9 +1135,26 @@ function renderProposal() {
 
     <div class="terms-box">
       <h4>거래 조건 (Terms & Conditions) — ${channel.name}</h4>
-      ${terms.map((t) => `<p>${t}</p>`).join("")}
+      ${termGroups
+        .map((group, idx) => {
+          const stored = proposalState.termsSelections[idx];
+          const currentIndex = Number.isInteger(stored) && stored < group.options.length ? stored : group.selected;
+          if (group.options.length <= 1) {
+            return `<p>${group.options[0] ?? ""}</p>`;
+          }
+          return `
+            <div class="terms-line-select no-print">
+              <select class="terms-option-select" data-term-index="${idx}">
+                ${group.options
+                  .map((opt, i) => `<option value="${i}" ${i === currentIndex ? "selected" : ""}>${opt}</option>`)
+                  .join("")}
+              </select>
+            </div>
+            <p class="print-only-term">${group.options[currentIndex]}</p>`;
+        })
+        .join("")}
       <p class="no-print" style="margin-top:12px;font-size:13px;color:var(--text-muted)">
-        거래 조건을 바꾸려면 왼쪽 메뉴 <strong>데이터 관리 → 국가·업체·거래조건</strong>에서 수정하세요.
+        거래 조건 항목·옵션을 바꾸려면 왼쪽 메뉴 <strong>데이터 관리 → 국가·업체·거래조건</strong>에서 수정하세요. 여러 옵션이 있는 항목은 위에서 이 단가표에 적용할 옵션을 선택할 수 있습니다.
       </p>
     </div>
   `;
@@ -1190,6 +1214,14 @@ function bindProposalEvents() {
     render();
   });
 
+  document.querySelectorAll(".terms-option-select").forEach((select) => {
+    select.addEventListener("change", (e) => {
+      const idx = parseInt(e.target.dataset.termIndex, 10);
+      proposalState.termsSelections[idx] = parseInt(e.target.value, 10);
+      render();
+    });
+  });
+
   document.querySelectorAll(".product-select-checkbox").forEach((checkbox) => {
     checkbox.addEventListener("change", (e) => {
       const code = e.target.dataset.code;
@@ -1247,7 +1279,7 @@ function bindProposalEvents() {
     proposalState.clientName = selected.clientName;
     const channel = findChannel(selected.channelId);
     const products = getProducts(appData).filter((p) => proposalState.items[p.code]?.included !== false);
-    const terms = getChannelTerms(appData, proposalState.channelId);
+    const terms = getResolvedProposalTerms();
     const items = products.map((p) => {
       const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
       const { fobUsd, fobKrw } = calcFobFromSrp(
@@ -1292,7 +1324,7 @@ function bindProposalEvents() {
       showToast("주문수량을 입력한 제품이 없습니다");
       return;
     }
-    const terms = getChannelTerms(appData, proposalState.channelId);
+    const terms = getResolvedProposalTerms();
     const items = products.map((p) => {
       const item = proposalState.items[p.code];
       const { fobUsd, fobKrw } = calcFobFromSrp(
@@ -1330,7 +1362,7 @@ function bindProposalEvents() {
     try {
       showToast("PDF 생성 중...");
       const products = getProducts(appData).filter((p) => proposalState.items[p.code]?.included !== false);
-      const terms = getChannelTerms(appData, proposalState.channelId);
+      const terms = getResolvedProposalTerms();
       const items = products.map((p) => {
         const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
         const { fobUsd, fobKrw } = calcFobFromSrp(
@@ -1921,7 +1953,7 @@ async function savePoUpload() {
   poUploadState.poNumber = form.poNumber;
 
   const channel = findChannel(form.channelId);
-  const terms = getChannelTerms(appData, form.channelId);
+  const terms = resolveChannelTerms(getChannelTerms(appData, form.channelId), {});
   const products = getProducts(appData);
   let items = [];
   let source = "po-upload";
@@ -3267,11 +3299,34 @@ function renderMasterChannelDetail(channelId) {
 
     <div class="card">
       <div class="card-title">③ 거래 조건 (T&C) — ${channel.name}</div>
-      <p class="card-desc">한 줄에 한 항목씩 작성하세요. 저장하면 이후 단가표·발주서에 반영됩니다.</p>
-      <form id="master-terms-form">
-        <div class="form-group">
-          <textarea id="master-terms-editor" class="terms-editor" rows="10" placeholder="1. 납품 조건 : ...&#10;2. 결제 조건 : ...">${terms.join("\n")}</textarea>
-        </div>
+      <p class="card-desc">
+        조건 하나에 여러 옵션을 줄바꿈으로 입력하면, 단가표 작성 시 이 단가표에 적용할 옵션을 선택할 수 있습니다.
+        (첫 줄이 기본값)
+      </p>
+      <form id="master-terms-form" class="term-groups-form">
+        ${
+          terms.length === 0
+            ? `<p class="text-muted">등록된 거래 조건이 없습니다. 아래 버튼으로 추가하세요.</p>`
+            : ""
+        }
+        ${terms
+          .map(
+            (group, idx) => `
+          <div class="term-group">
+            <div class="term-group-header">
+              <span>조건 ${idx + 1}</span>
+              <button type="button" class="btn btn-secondary btn-sm" data-term-remove="${idx}">삭제</button>
+            </div>
+            <textarea class="terms-editor term-group-editor" data-term-index="${idx}" rows="${Math.max(
+              2,
+              group.options.length
+            )}" placeholder="예: 5. TERMS OF PAYMENT : T/T (50% in advance / 50% Before loading)">${group.options.join(
+              "\n"
+            )}</textarea>
+          </div>`
+          )
+          .join("")}
+        <button type="button" class="btn btn-secondary" id="btn-master-add-term">+ 조건 추가</button>
         <div class="master-form-actions">
           <button type="submit" class="btn btn-primary">거래 조건 저장</button>
           <button type="button" class="btn btn-secondary" id="btn-master-reset-terms">기본값 복원</button>
@@ -3279,8 +3334,21 @@ function renderMasterChannelDetail(channelId) {
         </div>
       </form>
       <div class="terms-box master-terms-preview">
-        <h4>미리보기</h4>
-        ${terms.length ? terms.map((t) => `<p>${t}</p>`).join("") : "<p class='text-muted'>등록된 거래 조건이 없습니다.</p>"}
+        <h4>미리보기 (기본값 기준)</h4>
+        ${
+          terms.length
+            ? terms
+                .map(
+                  (group) =>
+                    `<p>${group.options[group.selected] ?? group.options[0] ?? ""}${
+                      group.options.length > 1
+                        ? ` <span class="term-option-count">(${group.options.length}개 옵션)</span>`
+                        : ""
+                    }</p>`
+                )
+                .join("")
+            : "<p class='text-muted'>등록된 거래 조건이 없습니다.</p>"
+        }
       </div>
     </div>
   `;
@@ -3382,17 +3450,40 @@ function bindMasterEvents() {
     });
   });
 
+  function readTermGroupsFromMasterForm() {
+    return Array.from(document.querySelectorAll(".term-group-editor")).map((el) => ({
+      options: el.value
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0),
+      selected: 0,
+    }));
+  }
+
   document.getElementById("master-terms-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
-    const text = document.getElementById("master-terms-editor")?.value || "";
-    const terms = text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+    const terms = readTermGroupsFromMasterForm().filter((g) => g.options.length > 0);
     setChannelTerms(appData, masterChannelId, terms);
     termsChannelId = masterChannelId;
     showToast("거래 조건이 저장되었습니다");
     render();
+  });
+
+  document.getElementById("btn-master-add-term")?.addEventListener("click", () => {
+    const terms = readTermGroupsFromMasterForm();
+    terms.push({ options: [""], selected: 0 });
+    setChannelTerms(appData, masterChannelId, terms);
+    render();
+  });
+
+  document.querySelectorAll("[data-term-remove]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.termRemove, 10);
+      const terms = readTermGroupsFromMasterForm();
+      terms.splice(idx, 1);
+      setChannelTerms(appData, masterChannelId, terms);
+      render();
+    });
   });
 
   document.getElementById("btn-master-reset-terms")?.addEventListener("click", async () => {

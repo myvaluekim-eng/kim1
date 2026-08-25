@@ -2500,6 +2500,71 @@ td.total-row {
   color: var(--text-muted);
 }
 
+.term-option-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.term-groups-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.term-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: var(--bg-soft);
+}
+
+.term-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.term-group-header .btn-sm {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.term-group-editor {
+  min-height: 44px;
+}
+
+/* ── Per-proposal terms option select ── */
+.terms-line-select {
+  margin-bottom: 4px;
+}
+
+.terms-option-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  background: #fffdf5;
+}
+
+.print-only-term {
+  display: none;
+}
+
+@media print {
+  .print-only-term {
+    display: block;
+  }
+}
+
 .form-grid-full {
   grid-column: 1 / -1;
 }

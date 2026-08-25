@@ -121,11 +121,11 @@ const DEFAULT_CHANNELS = [
     currencySymbol: "₩",
     defaultFobRate: 0.35,
     terms: [
-      "1. 납품 조건 : 올리브영 물류센터 직납",
-      "2. 결제 조건 : 월말 마감 익월 15일 지급",
-      "3. 반품·클레임 : 유통기한 6개월 미만 시 반품 가능",
-      "4. 가격 조건 : VAT 포함 소비자가 기준",
-      "5. 프로모션 : 별도 협의",
+      { options: ["1. 납품 조건 : 올리브영 물류센터 직납"], selected: 0 },
+      { options: ["2. 결제 조건 : 월말 마감 익월 15일 지급"], selected: 0 },
+      { options: ["3. 반품·클레임 : 유통기한 6개월 미만 시 반품 가능"], selected: 0 },
+      { options: ["4. 가격 조건 : VAT 포함 소비자가 기준"], selected: 0 },
+      { options: ["5. 프로모션 : 별도 협의"], selected: 0 },
     ],
   },
   {
@@ -135,13 +135,23 @@ const DEFAULT_CHANNELS = [
     currencySymbol: "$",
     defaultFobRate: 0.29,
     terms: [
-      "1. PACKING : EXPORT STANDARD PACKING WITH PALLET",
-      "2. PRODUCT LABEL : ENGLISH/ARABIC LABELLING ON THE PRODUCTS",
-      "3. SFDA REGISTRATION DOCS & DATA : TBD",
-      "4. EXPORT DOCUMENTS : TBD",
-      "5. TERMS OF PAYMENT : T/T (50% in advance / 50% Before loading)",
-      "6. PRICE TERMS : USD FOB, Busan, Korea",
-      "7. SHIPMENT(Lead time) : 6-7 weeks",
+      { options: ["1. PACKING : EXPORT STANDARD PACKING WITH PALLET"], selected: 0 },
+      { options: ["2. PRODUCT LABEL : ENGLISH/ARABIC LABELLING ON THE PRODUCTS"], selected: 0 },
+      { options: ["3. SFDA REGISTRATION DOCS & DATA : TBD"], selected: 0 },
+      { options: ["4. EXPORT DOCUMENTS : TBD"], selected: 0 },
+      {
+        options: [
+          "5. TERMS OF PAYMENT : T/T (50% in advance / 50% Before loading)",
+          "5. TERMS OF PAYMENT : T/T (30% in advance / 70% Before loading)",
+          "5. TERMS OF PAYMENT : L/C AT SIGHT",
+        ],
+        selected: 0,
+      },
+      { options: ["6. PRICE TERMS : USD FOB, Busan, Korea"], selected: 0 },
+      {
+        options: ["7. SHIPMENT(Lead time) : 6-7 weeks", "7. SHIPMENT(Lead time) : 4-5 weeks"],
+        selected: 0,
+      },
     ],
   },
   {
@@ -151,12 +161,18 @@ const DEFAULT_CHANNELS = [
     currencySymbol: "$",
     defaultFobRate: 0.32,
     terms: [
-      "1. FDA COMPLIANCE : All products must meet FDA regulations",
-      "2. PRODUCT LABEL : ENGLISH LABELLING REQUIRED",
-      "3. PRICE TERMS : USD FOB, Busan, Korea",
-      "4. TERMS OF PAYMENT : T/T (30% advance / 70% before shipment)",
-      "5. SHIPMENT : 4-6 weeks after order confirmation",
-      "6. INSURANCE : To be covered by buyer",
+      { options: ["1. FDA COMPLIANCE : All products must meet FDA regulations"], selected: 0 },
+      { options: ["2. PRODUCT LABEL : ENGLISH LABELLING REQUIRED"], selected: 0 },
+      { options: ["3. PRICE TERMS : USD FOB, Busan, Korea"], selected: 0 },
+      {
+        options: [
+          "4. TERMS OF PAYMENT : T/T (30% advance / 70% before shipment)",
+          "4. TERMS OF PAYMENT : T/T (50% advance / 50% before shipment)",
+        ],
+        selected: 0,
+      },
+      { options: ["5. SHIPMENT : 4-6 weeks after order confirmation"], selected: 0 },
+      { options: ["6. INSURANCE : To be covered by buyer"], selected: 0 },
     ],
   },
 ];
