@@ -2500,69 +2500,89 @@ td.total-row {
   color: var(--text-muted);
 }
 
-.term-option-count {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-weight: 400;
-}
-
-.term-groups-form {
+.term-presets-form {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.term-group {
+.term-preset {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   background: var(--bg-soft);
 }
 
-.term-group-header {
+.term-preset-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 8px;
+}
+
+.term-preset-name {
+  flex: 1;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 700;
   color: var(--text-secondary);
+  background: #fff;
 }
 
-.term-group-header .btn-sm {
+.term-preset-header .btn-sm {
   height: 26px;
   padding: 0 10px;
   font-size: 12px;
+  flex-shrink: 0;
 }
 
-.term-group-editor {
-  min-height: 44px;
+.term-preset-editor {
+  min-height: 100px;
 }
 
-/* ── Per-proposal terms option select ── */
-.terms-line-select {
+.term-preset-preview {
+  margin-bottom: 16px;
+}
+
+.term-preset-preview:last-child {
+  margin-bottom: 0;
+}
+
+.term-preset-preview-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   margin-bottom: 4px;
 }
 
-.terms-option-select {
-  width: 100%;
-  height: 38px;
+/* ── Per-proposal terms preset select ── */
+.terms-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.terms-box-header h4 {
+  margin-bottom: 0;
+}
+
+.terms-preset-select {
+  height: 36px;
   padding: 0 12px;
   border: 1px solid var(--primary);
   border-radius: 8px;
-  font-size: 14px;
-  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-hover);
   background: #fffdf5;
-}
-
-.print-only-term {
-  display: none;
-}
-
-@media print {
-  .print-only-term {
-    display: block;
-  }
+  flex-shrink: 0;
 }
 
 .form-grid-full {

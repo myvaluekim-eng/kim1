@@ -24,29 +24,28 @@ function initChannelSrpForProduct(data, productCode) {
   });
 }
 
-function normalizeTermGroup(entry) {
-  if (typeof entry === "string") return { options: [entry], selected: 0 };
-  const options = Array.isArray(entry?.options) && entry.options.length ? entry.options : [""];
-  let selected = Number.isInteger(entry?.selected) ? entry.selected : 0;
-  if (selected < 0 || selected >= options.length) selected = 0;
-  return { options, selected };
-}
+function normalizeTermPresets(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
 
-function normalizeTermGroups(list) {
-  return (list || []).map(normalizeTermGroup);
-}
+  // Very old format: flat array of line strings, e.g. ["1. PACKING : ...", "2. ..."]
+  if (typeof raw[0] === "string") {
+    return [{ id: "preset-1", name: "기본 조건", lines: raw }];
+  }
 
-function resolveChannelTerms(groups, selections = {}) {
-  return groups
-    .map((group, idx) => {
-      const override = selections[idx];
-      const optionIndex =
-        Number.isInteger(override) && override >= 0 && override < group.options.length
-          ? override
-          : group.selected;
-      return group.options[optionIndex] ?? group.options[0] ?? "";
-    })
-    .filter((text) => text.trim().length > 0);
+  // Previous per-line multi-option format: [{options:[...], selected:0}, ...]
+  if (raw[0] && Array.isArray(raw[0].options)) {
+    const lines = raw
+      .map((g) => g.options[g.selected] ?? g.options[0] ?? "")
+      .filter((line) => line.trim().length > 0);
+    return [{ id: "preset-1", name: "기본 조건", lines }];
+  }
+
+  // Current preset format: [{id, name, lines}, ...]
+  return raw.map((p, i) => ({
+    id: p.id || `preset-${i + 1}`,
+    name: p.name || `조건 ${i + 1}`,
+    lines: Array.isArray(p.lines) ? p.lines : [],
+  }));
 }
 
 function migrateChannels(data) {
@@ -57,7 +56,7 @@ function migrateChannels(data) {
   getChannels(data).forEach((ch) => {
     const def = DEFAULT_CHANNELS.find((d) => d.id === ch.id);
     const existing = data.channelTerms[ch.id] ?? (def ? def.terms : ch.terms || []);
-    data.channelTerms[ch.id] = normalizeTermGroups(existing);
+    data.channelTerms[ch.id] = normalizeTermPresets(existing);
   });
 }
 
@@ -183,16 +182,16 @@ function deleteProduct(data, code) {
   return { ok: true };
 }
 
-function getChannelTerms(data, channelId) {
-  const groups = data.channelTerms?.[channelId] ?? DEFAULT_CHANNELS.find((c) => c.id === channelId)?.terms ?? [];
-  return normalizeTermGroups(groups);
+function getChannelTermPresets(data, channelId) {
+  const raw = data.channelTerms?.[channelId] ?? DEFAULT_CHANNELS.find((c) => c.id === channelId)?.terms ?? [];
+  return normalizeTermPresets(raw);
 }
 
-function getDefaultChannelTerms(data, channelId) {
+function getDefaultChannelTermPresets(data, channelId) {
   const def = DEFAULT_CHANNELS.find((c) => c.id === channelId);
-  if (def) return normalizeTermGroups(def.terms);
+  if (def) return normalizeTermPresets(def.terms);
   const ch = getChannels(data).find((c) => c.id === channelId);
-  return normalizeTermGroups(ch?.terms || []);
+  return normalizeTermPresets(ch?.terms || []);
 }
 
 function generateChannelId(data, name) {
@@ -330,7 +329,7 @@ function getChannelUsage(data, channelId) {
 
 function setChannelTerms(data, channelId, terms) {
   if (!data.channelTerms) data.channelTerms = {};
-  data.channelTerms[channelId] = normalizeTermGroups(terms);
+  data.channelTerms[channelId] = normalizeTermPresets(terms);
   saveData(data);
 }
 
