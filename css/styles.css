@@ -2138,8 +2138,8 @@ td.total-row {
 
 .sidebar-account {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
   padding: 14px 22px;
   border-top: 1px solid var(--sidebar-border);
@@ -2147,8 +2147,8 @@ td.total-row {
 
 .sidebar-account-info {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -2156,18 +2156,24 @@ td.total-row {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-account-position {
   font-size: 11px;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-account-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
-  flex-shrink: 0;
 }
 
 .sidebar-account-logout,
@@ -2177,11 +2183,12 @@ td.total-row {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
+  flex: 1 1 auto;
 }
 
 .sidebar-account-logout:hover,
