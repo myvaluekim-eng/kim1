@@ -1143,7 +1143,7 @@ function renderProposal() {
       <div class="terms-box-header">
         <h4>거래 조건 (Terms & Conditions) — ${channel.name}</h4>
         ${
-          termPresets.length > 1
+          termPresets.length > 0
             ? `
           <select class="terms-preset-select no-print" id="terms-preset-select">
             ${termPresets
@@ -1159,7 +1159,7 @@ function renderProposal() {
       ${(activePreset?.lines || []).map((line) => `<p>${line}</p>`).join("")}
       <p class="no-print" style="margin-top:12px;font-size:13px;color:var(--text-muted)">
         거래 조건 내용을 바꾸려면 왼쪽 메뉴 <strong>데이터 관리 → 국가·업체·거래조건</strong>에서 수정하세요.
-        ${termPresets.length > 1 ? "여러 조건 세트가 있으면 위에서 이 단가표에 적용할 조건을 선택할 수 있습니다." : ""}
+        조건 세트가 여러 개면 위 목록에서 이 단가표에 적용할 조건을 선택할 수 있습니다.
       </p>
     </div>
   `;
