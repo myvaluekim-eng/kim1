@@ -893,31 +893,17 @@ function renderProposal() {
   const channelClients = getClients(appData, proposalState.channelId);
 
   const productSelectHtml = `
-    <div class="product-select-panel no-print">
-      <div class="product-select-header">
-        <span>포함할 제품 선택 (${includedProducts.length}/${products.length})</span>
-        <div class="product-select-actions">
-          <button type="button" class="btn btn-secondary btn-compact" id="btn-select-all-products">전체 선택</button>
-          <button type="button" class="btn btn-secondary btn-compact" id="btn-select-none-products">전체 해제</button>
-        </div>
-      </div>
-      <div class="product-select-list">
-        ${products
-          .map(
-            (p) => `
-          <label class="product-select-item">
-            <input type="checkbox" class="product-select-checkbox" data-code="${p.code}" ${
-              proposalState.items[p.code]?.included !== false ? "checked" : ""
-            }>
-            <span>${p.nameKor}</span>
-          </label>`
-          )
-          .join("")}
+    <div class="product-select-toolbar no-print">
+      <span>포함할 제품: ${includedProducts.length}/${products.length} · 표 왼쪽 체크박스로 제품별 포함 여부를 선택하세요</span>
+      <div class="product-select-actions">
+        <button type="button" class="btn btn-secondary btn-compact" id="btn-select-all-products">전체 선택</button>
+        <button type="button" class="btn btn-secondary btn-compact" id="btn-select-none-products">전체 해제</button>
       </div>
     </div>`;
 
-  const rows = includedProducts.map((p) => {
+  const rows = products.map((p) => {
     const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
+    const included = proposalState.items[p.code]?.included !== false;
     const effectiveFobRate = getEffectiveFobRatePercent(item, p);
     const { fobUsd, fobKrw } = calcFobFromSrp(
       item.srpKrw,
@@ -927,7 +913,10 @@ function renderProposal() {
     );
 
     return `
-      <tr data-code="${p.code}">
+      <tr data-code="${p.code}" class="${included ? "" : "row-excluded"}">
+        <td class="no-print product-include-cell">
+          <input type="checkbox" class="product-select-checkbox" data-code="${p.code}" ${included ? "checked" : ""}>
+        </td>
         <td>${p.category}</td>
         <td style="font-size:12px">${p.barcode || "—"}</td>
         <td>${p.nameKor}</td>
@@ -1073,6 +1062,7 @@ function renderProposal() {
         <table id="proposal-table">
           <thead>
             <tr>
+              <th class="no-print"></th>
               <th>Category</th>
               <th>Barcode</th>
               <th>Product (KOR)</th>
@@ -1098,7 +1088,7 @@ function renderProposal() {
               <th>Origin</th>
             </tr>
           </thead>
-          <tbody>${rows || '<tr><td colspan="23" class="product-select-empty">선택된 제품이 없습니다. 위에서 제품을 선택해주세요.</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="24" class="product-select-empty">등록된 제품이 없습니다.</td></tr>'}</tbody>
         </table>
       </div>
     </div>
