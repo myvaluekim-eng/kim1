@@ -1937,6 +1937,96 @@ td.total-row {
   text-align: right;
 }
 
+/* ── Domestic (국내) estimate document ── */
+.domestic-estimate-doc {
+  min-width: 980px;
+}
+
+.domestic-doc-title {
+  background: #1b3a5c;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  padding: 14px;
+}
+
+.domestic-doc-meta {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.domestic-doc-meta td {
+  border: 1px solid #999;
+  padding: 6px 10px;
+}
+
+.domestic-doc-meta .meta-label {
+  font-weight: 700;
+  background: #f4f4f4;
+  white-space: nowrap;
+  width: 1%;
+}
+
+.domestic-doc-meta .meta-value {
+  min-width: 120px;
+}
+
+.domestic-doc-meta .meta-highlight {
+  background: #d9e8f7;
+}
+
+.domestic-doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 14px;
+  table-layout: fixed;
+}
+
+.domestic-doc-table th {
+  background: #3f6fb5;
+  color: #fff;
+  font-weight: 700;
+  padding: 8px 4px;
+  border: 1px solid #2c5590;
+  text-align: center;
+}
+
+.domestic-doc-table td {
+  border: 1px solid #ccc;
+  padding: 6px 8px;
+  height: 24px;
+}
+
+.domestic-doc-table td.num {
+  text-align: right;
+}
+
+.domestic-doc-table td.editable-cell {
+  background: #fdf1cd;
+}
+
+.domestic-doc-product {
+  text-align: left;
+}
+
+.domestic-doc-total {
+  background: #d9ead3;
+  font-weight: 700;
+}
+
+.domestic-doc-total td {
+  text-align: right;
+  border: 1px solid #999;
+}
+
+.domestic-doc-total td:first-child {
+  text-align: center;
+}
+
 .proposal-detail-table-wrap {
   overflow-x: auto;
 }

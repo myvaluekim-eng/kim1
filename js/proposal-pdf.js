@@ -336,7 +336,118 @@ function buildProposalDocumentHtml(proposal) {
   `;
 }
 
+function buildDomesticEstimateDocumentHtml(proposal) {
+  const items = getProposalDisplayItems(proposal).filter((item) => (item.poQty || 0) > 0);
+  const totalRowCount = 15;
+
+  const dataRows = items.map((item, i) => {
+    const amount = item.amount || 0;
+    const vat = Math.round(amount * 0.1);
+    const grandTotal = amount + vat;
+    const supplyRate = item.fobRate != null ? `${formatNumber(item.fobRate, 1)}%` : "—";
+    return `
+      <tr>
+        <td class="num">${i + 1}</td>
+        <td class="domestic-doc-product">${item.nameKor}</td>
+        <td>${item.size || "—"}</td>
+        <td class="num editable-cell">${item.srpKrw != null ? formatKrw(item.srpKrw) : "—"}</td>
+        <td class="num">${supplyRate}</td>
+        <td class="num">${item.fobKrw != null ? formatKrw(item.fobKrw) : "—"}</td>
+        <td class="num editable-cell">${item.poQty || 0}</td>
+        <td class="num">${formatKrw(amount)}</td>
+        <td class="num">${formatKrw(vat)}</td>
+        <td class="num">${formatKrw(grandTotal)}</td>
+      </tr>`;
+  });
+
+  for (let i = items.length; i < totalRowCount; i++) {
+    dataRows.push(`
+      <tr>
+        <td class="num">${i + 1}</td>
+        <td></td>
+        <td></td>
+        <td class="editable-cell"></td>
+        <td></td>
+        <td></td>
+        <td class="editable-cell"></td>
+        <td></td>
+        <td></td>
+        <td></td>
+      </tr>`);
+  }
+
+  const totalSupply = items.reduce((sum, item) => sum + (item.amount || 0), 0);
+  const totalVat = Math.round(totalSupply * 0.1);
+  const totalGrand = totalSupply + totalVat;
+
+  return `
+    <div class="proposal-doc domestic-estimate-doc">
+      <div class="domestic-doc-title">제품 공급 견적서</div>
+      <table class="domestic-doc-meta">
+        <tr>
+          <td class="meta-label">공급자</td>
+          <td class="meta-value" colspan="2">Barle Cosmetics</td>
+          <td class="meta-label">견적일</td>
+          <td class="meta-value meta-highlight">${proposal.poDate || "—"}</td>
+          <td class="meta-label">견적 유효기간</td>
+          <td class="meta-value">30일</td>
+        </tr>
+        <tr>
+          <td class="meta-label">담당자</td>
+          <td class="meta-value" colspan="2">${proposal.staffName || "—"}</td>
+          <td class="meta-label">연락처</td>
+          <td class="meta-value meta-highlight">${proposal.clientContact || "—"}</td>
+          <td class="meta-label">VAT 기준</td>
+          <td class="meta-value">별도</td>
+        </tr>
+        <tr>
+          <td class="meta-label">거래처명</td>
+          <td class="meta-value" colspan="2">${proposal.clientName || "—"}</td>
+          <td class="meta-label">담당자</td>
+          <td class="meta-value meta-highlight"></td>
+          <td class="meta-label">결제조건</td>
+          <td class="meta-value">발주 시 100% 선입금</td>
+        </tr>
+      </table>
+
+      <table class="domestic-doc-table">
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>제품명</th>
+            <th>규격/용량</th>
+            <th>정상 소비자가<br>(VAT 포함)</th>
+            <th>공급률</th>
+            <th>공급단가<br>(VAT 별도)</th>
+            <th>수량</th>
+            <th>공급금액</th>
+            <th>VAT</th>
+            <th>합계금액</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${dataRows.join("")}
+        </tbody>
+        <tfoot>
+          <tr class="domestic-doc-total">
+            <td colspan="7">합계</td>
+            <td class="num">${formatKrw(totalSupply)}</td>
+            <td class="num">${formatKrw(totalVat)}</td>
+            <td class="num">${formatKrw(totalGrand)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <p class="proposal-doc-footer">Barle Cosmetics · barle.co.kr</p>
+    </div>
+  `;
+}
+
 function buildEstimateDocumentHtml(proposal) {
+  if (proposal.termsPresetName === "국내") {
+    return buildDomesticEstimateDocumentHtml(proposal);
+  }
+
   const channel = getChannelList().find((c) => c.id === proposal.channelId);
   const items = getProposalDisplayItems(proposal).filter((item) => (item.poQty || 0) > 0);
   const totals = getProposalDisplayTotals(items, channel);

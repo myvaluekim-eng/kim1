@@ -1327,6 +1327,8 @@ function bindProposalEvents() {
       return;
     }
     const terms = getResolvedProposalTerms();
+    const termsPresetName = getActiveTermsPreset()?.name || "";
+    const client = getClients(appData, selected.channelId).find((c) => c.id === selected.clientId);
     const items = products.map((p) => {
       const item = proposalState.items[p.code];
       const { fobUsd, fobKrw } = calcFobFromSrp(
@@ -1349,6 +1351,9 @@ function bindProposalEvents() {
       items,
       totalAmount,
       terms,
+      termsPresetName,
+      clientContact: client?.contact || "",
+      staffName: document.getElementById("current-employee-name")?.textContent || "",
       recordType: "estimate",
     });
     showToast(`견적서 저장 완료 — v${version} (지난 단가표에서 확인)`);
