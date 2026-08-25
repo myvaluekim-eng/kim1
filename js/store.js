@@ -190,8 +190,7 @@ function getChannelTermPresets(data, channelId) {
 function getDefaultChannelTermPresets(data, channelId) {
   const def = DEFAULT_CHANNELS.find((c) => c.id === channelId);
   if (def) return normalizeTermPresets(def.terms);
-  const ch = getChannels(data).find((c) => c.id === channelId);
-  return normalizeTermPresets(ch?.terms || []);
+  return normalizeTermPresets(buildDefaultTermPresets());
 }
 
 function generateChannelId(data, name) {
@@ -253,7 +252,7 @@ function addChannel(data, channel) {
     currency,
     currencySymbol: currency === "KRW" ? "₩" : "$",
     defaultFobRate: (isNaN(fobPercent) ? 30 : fobPercent) / 100,
-    terms: [],
+    terms: buildDefaultTermPresets(),
   };
 
   data.channels = [...channels, newChannel];
@@ -262,7 +261,7 @@ function addChannel(data, channel) {
     data.channelSrp[p.code][id] = { krw: null, usd: null };
   });
   if (!data.channelTerms) data.channelTerms = {};
-  data.channelTerms[id] = [];
+  data.channelTerms[id] = buildDefaultTermPresets();
   saveData(data);
   return { ok: true, id };
 }
