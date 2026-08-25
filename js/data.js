@@ -113,6 +113,32 @@ const DEFAULT_PRODUCTS = [
   },
 ];
 
+const DEFAULT_TERMS_EXPORT_LINES = [
+  "1. FDA COMPLIANCE : All products must meet FDA regulations",
+  "2. PRODUCT LABEL : ENGLISH LABELLING REQUIRED",
+  "3. PRICE TERMS : USD FOB, Busan, Korea",
+  "4. TERMS OF PAYMENT : T/T (30% advance / 70% before shipment)",
+  "5. SHIPMENT : 4-6 weeks after order confirmation",
+  "6. INSURANCE : To be covered by buyer",
+];
+
+const DEFAULT_TERMS_DOMESTIC_LINES = [
+  "• 상기 공급단가는 VAT 별도 기준입니다.",
+  "• 견적 유효기간은 견적일로부터 30일입니다.",
+  "• 최소 발주수량(MOQ)은 제품 및 거래 조건에 따라 별도 협의합니다.",
+  "• 결제조건은 발주 시 100% 선입금을 기본으로 하며, 별도 협의 가능합니다.",
+  "• 입금 및 재고 확인 후 출고되며, 납기 일정은 발주 시 확정됩니다.",
+  "• 배송비 및 대량 발주·프로모션 조건은 별도 협의합니다.",
+  "• 판매 프로모션 및 가격 운영은 브랜드 정책에 따라 사전 협의가 필요할 수 있습니다.",
+];
+
+function buildDefaultTermPresets() {
+  return [
+    { id: "preset-1", name: "해외", lines: [...DEFAULT_TERMS_EXPORT_LINES] },
+    { id: "preset-2", name: "국내", lines: [...DEFAULT_TERMS_DOMESTIC_LINES] },
+  ];
+}
+
 const DEFAULT_CHANNELS = [
   {
     id: "KR-OLIVE",
@@ -120,32 +146,7 @@ const DEFAULT_CHANNELS = [
     currency: "KRW",
     currencySymbol: "₩",
     defaultFobRate: 0.35,
-    terms: [
-      {
-        id: "preset-1",
-        name: "올리브영 기본 조건",
-        lines: [
-          "1. 납품 조건 : 올리브영 물류센터 직납",
-          "2. 결제 조건 : 월말 마감 익월 15일 지급",
-          "3. 반품·클레임 : 유통기한 6개월 미만 시 반품 가능",
-          "4. 가격 조건 : VAT 포함 소비자가 기준",
-          "5. 프로모션 : 별도 협의",
-        ],
-      },
-      {
-        id: "preset-2",
-        name: "국내 일반",
-        lines: [
-          "• 상기 공급단가는 VAT 별도 기준입니다.",
-          "• 견적 유효기간은 견적일로부터 30일입니다.",
-          "• 최소 발주수량(MOQ)은 제품 및 거래 조건에 따라 별도 협의합니다.",
-          "• 결제조건은 발주 시 100% 선입금을 기본으로 하며, 별도 협의 가능합니다.",
-          "• 입금 및 재고 확인 후 출고되며, 납기 일정은 발주 시 확정됩니다.",
-          "• 배송비 및 대량 발주·프로모션 조건은 별도 협의합니다.",
-          "• 판매 프로모션 및 가격 운영은 브랜드 정책에 따라 사전 협의가 필요할 수 있습니다.",
-        ],
-      },
-    ],
+    terms: buildDefaultTermPresets(),
   },
   {
     id: "CN",
@@ -153,21 +154,7 @@ const DEFAULT_CHANNELS = [
     currency: "USD",
     currencySymbol: "$",
     defaultFobRate: 0.29,
-    terms: [
-      {
-        id: "preset-1",
-        name: "해외 수출 조건",
-        lines: [
-          "1. PACKING : EXPORT STANDARD PACKING WITH PALLET",
-          "2. PRODUCT LABEL : ENGLISH/ARABIC LABELLING ON THE PRODUCTS",
-          "3. SFDA REGISTRATION DOCS & DATA : TBD",
-          "4. EXPORT DOCUMENTS : TBD",
-          "5. TERMS OF PAYMENT : T/T (50% in advance / 50% Before loading)",
-          "6. PRICE TERMS : USD FOB, Busan, Korea",
-          "7. SHIPMENT(Lead time) : 6-7 weeks",
-        ],
-      },
-    ],
+    terms: buildDefaultTermPresets(),
   },
   {
     id: "US",
@@ -175,20 +162,7 @@ const DEFAULT_CHANNELS = [
     currency: "USD",
     currencySymbol: "$",
     defaultFobRate: 0.32,
-    terms: [
-      {
-        id: "preset-1",
-        name: "해외 수출 조건",
-        lines: [
-          "1. FDA COMPLIANCE : All products must meet FDA regulations",
-          "2. PRODUCT LABEL : ENGLISH LABELLING REQUIRED",
-          "3. PRICE TERMS : USD FOB, Busan, Korea",
-          "4. TERMS OF PAYMENT : T/T (30% advance / 70% before shipment)",
-          "5. SHIPMENT : 4-6 weeks after order confirmation",
-          "6. INSURANCE : To be covered by buyer",
-        ],
-      },
-    ],
+    terms: buildDefaultTermPresets(),
   },
 ];
 
