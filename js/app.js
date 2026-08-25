@@ -178,6 +178,7 @@ function initProposalState(channelId) {
       srpUsd: p.srpUsd ?? null,
       poQty: 0,
       fobRateOverride: null,
+      included: true,
     };
   });
 }
@@ -887,10 +888,35 @@ function readProposalClientFromDom() {
 function renderProposal() {
   const channel = getChannelList().find((c) => c.id === proposalState.channelId);
   const products = getProducts(appData);
+  const includedProducts = products.filter((p) => proposalState.items[p.code]?.included !== false);
   const terms = getChannelTerms(appData, proposalState.channelId);
   const channelClients = getClients(appData, proposalState.channelId);
 
-  const rows = products.map((p) => {
+  const productSelectHtml = `
+    <div class="product-select-panel no-print">
+      <div class="product-select-header">
+        <span>포함할 제품 선택 (${includedProducts.length}/${products.length})</span>
+        <div class="product-select-actions">
+          <button type="button" class="btn btn-secondary btn-compact" id="btn-select-all-products">전체 선택</button>
+          <button type="button" class="btn btn-secondary btn-compact" id="btn-select-none-products">전체 해제</button>
+        </div>
+      </div>
+      <div class="product-select-list">
+        ${products
+          .map(
+            (p) => `
+          <label class="product-select-item">
+            <input type="checkbox" class="product-select-checkbox" data-code="${p.code}" ${
+              proposalState.items[p.code]?.included !== false ? "checked" : ""
+            }>
+            <span>${p.nameKor}</span>
+          </label>`
+          )
+          .join("")}
+      </div>
+    </div>`;
+
+  const rows = includedProducts.map((p) => {
     const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
     const effectiveFobRate = getEffectiveFobRatePercent(item, p);
     const { fobUsd, fobKrw } = calcFobFromSrp(
@@ -931,7 +957,7 @@ function renderProposal() {
       </tr>`;
   }).join("");
 
-  const estimateRows = products.map((p) => {
+  const estimateRows = includedProducts.map((p) => {
     const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
     const { fobUsd, fobKrw } = calcFobFromSrp(
       item.srpKrw,
@@ -960,7 +986,7 @@ function renderProposal() {
       </tr>`;
   }).join("");
 
-  const estimateTotals = computeEstimateTotals(products);
+  const estimateTotals = computeEstimateTotals(includedProducts);
 
   return `
     <div class="card">
@@ -1042,10 +1068,7 @@ function renderProposal() {
 
     <div class="section-block">
       <div class="section-label">③ 제품별 가격</div>
-      <div class="legend-bar no-print">
-        <span class="legend-item"><span class="legend-swatch editable"></span> 직접 입력</span>
-        <span class="legend-item"><span class="legend-swatch auto"></span> 자동 계산</span>
-      </div>
+      ${productSelectHtml}
       <div class="table-wrap">
         <table id="proposal-table">
           <thead>
@@ -1075,7 +1098,7 @@ function renderProposal() {
               <th>Origin</th>
             </tr>
           </thead>
-          <tbody>${rows}</tbody>
+          <tbody>${rows || '<tr><td colspan="23" class="product-select-empty">선택된 제품이 없습니다. 위에서 제품을 선택해주세요.</td></tr>'}</tbody>
         </table>
       </div>
     </div>
@@ -1085,10 +1108,6 @@ function renderProposal() {
         ? `
     <div class="section-block" id="estimate-panel">
       <div class="section-label">④ 견적서 — 주문수량 입력</div>
-      <div class="legend-bar no-print">
-        <span class="legend-item"><span class="legend-swatch editable"></span> 직접 입력</span>
-        <span class="legend-item"><span class="legend-swatch auto"></span> 자동 계산</span>
-      </div>
       <div class="table-wrap">
         <table id="estimate-table">
           <thead>
@@ -1183,6 +1202,30 @@ function bindProposalEvents() {
     render();
   });
 
+  document.querySelectorAll(".product-select-checkbox").forEach((checkbox) => {
+    checkbox.addEventListener("change", (e) => {
+      const code = e.target.dataset.code;
+      if (proposalState.items[code]) {
+        proposalState.items[code].included = e.target.checked;
+      }
+      render();
+    });
+  });
+
+  document.getElementById("btn-select-all-products")?.addEventListener("click", () => {
+    Object.values(proposalState.items).forEach((item) => {
+      item.included = true;
+    });
+    render();
+  });
+
+  document.getElementById("btn-select-none-products")?.addEventListener("click", () => {
+    Object.values(proposalState.items).forEach((item) => {
+      item.included = false;
+    });
+    render();
+  });
+
   document.querySelectorAll('#proposal-table input[data-field="fobRateOverride"]').forEach((input) => {
     input.addEventListener("input", (e) => {
       const code = e.target.dataset.code;
@@ -1215,7 +1258,7 @@ function bindProposalEvents() {
     proposalState.clientId = selected.clientId;
     proposalState.clientName = selected.clientName;
     const channel = findChannel(selected.channelId);
-    const products = getProducts(appData);
+    const products = getProducts(appData).filter((p) => proposalState.items[p.code]?.included !== false);
     const terms = getChannelTerms(appData, proposalState.channelId);
     const items = products.map((p) => {
       const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
@@ -1254,7 +1297,9 @@ function bindProposalEvents() {
     proposalState.clientId = selected.clientId;
     proposalState.clientName = selected.clientName;
     const channel = findChannel(selected.channelId);
-    const products = getProducts(appData).filter((p) => (proposalState.items[p.code]?.poQty || 0) > 0);
+    const products = getProducts(appData).filter(
+      (p) => proposalState.items[p.code]?.included !== false && (proposalState.items[p.code]?.poQty || 0) > 0
+    );
     if (products.length === 0) {
       showToast("주문수량을 입력한 제품이 없습니다");
       return;
@@ -1296,7 +1341,7 @@ function bindProposalEvents() {
     }
     try {
       showToast("PDF 생성 중...");
-      const products = getProducts(appData);
+      const products = getProducts(appData).filter((p) => proposalState.items[p.code]?.included !== false);
       const terms = getChannelTerms(appData, proposalState.channelId);
       const items = products.map((p) => {
         const item = proposalState.items[p.code] || { srpKrw: null, srpUsd: null, poQty: 0, fobRateOverride: null };
