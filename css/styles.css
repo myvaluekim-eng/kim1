@@ -1940,14 +1940,11 @@ td.total-row {
 /* ── Domestic (국내) estimate document ── */
 .domestic-estimate-doc {
   min-width: 900px;
-  min-height: 920px;
-  display: flex;
-  flex-direction: column;
   color: #000;
 }
 
 .domestic-doc-bottom {
-  margin-top: auto;
+  margin-top: 32px;
 }
 
 .domestic-doc-title {

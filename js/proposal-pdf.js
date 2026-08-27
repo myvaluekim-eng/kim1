@@ -561,9 +561,19 @@ async function exportProposalToPdf(proposal) {
   window.scrollTo(0, 0);
 
   const pxToMm = (px) => (px / 96) * 25.4;
-  const jsPDF = isEstimate
-    ? { unit: "mm", format: "a4", orientation: "landscape" }
-    : { unit: "mm", format: [pxToMm(2100), 210], orientation: "landscape" };
+  const isDomesticEstimate = isEstimate && proposal.termsPresetName === "국내";
+  let jsPDF;
+  if (!isEstimate) {
+    jsPDF = { unit: "mm", format: [pxToMm(2100), 210], orientation: "landscape" };
+  } else if (isDomesticEstimate) {
+    // Size the page to the actual content so it always fits on a single page,
+    // regardless of how many products/terms lines are included.
+    const contentWidthMm = pxToMm(el.offsetWidth);
+    const contentHeightMm = pxToMm(el.scrollHeight) + 30;
+    jsPDF = { unit: "mm", format: [contentWidthMm, contentHeightMm], orientation: "landscape" };
+  } else {
+    jsPDF = { unit: "mm", format: "a4", orientation: "landscape" };
+  }
 
   try {
     await html2pdf()
