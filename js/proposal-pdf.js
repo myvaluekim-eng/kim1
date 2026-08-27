@@ -373,43 +373,43 @@ function buildDomesticEstimateDocumentHtml(proposal) {
         <tr>
           <td class="meta-label">공급자</td>
           <td class="meta-value">Barle Cosmetics</td>
-          <td class="meta-label">견적일</td>
-          <td class="meta-value">${proposal.poDate || "—"}</td>
+          <td class="meta-label">담당자</td>
+          <td class="meta-value">${proposal.staffName || "—"}</td>
         </tr>
         <tr>
           <td class="meta-label">거래처명</td>
           <td class="meta-value">${proposal.clientName || "—"}</td>
+          <td class="meta-label">견적일</td>
+          <td class="meta-value">${proposal.poDate || "—"}</td>
+        </tr>
+        <tr>
           <td class="meta-label">연락처</td>
-          <td class="meta-value">${proposal.clientContact || "—"}</td>
+          <td class="meta-value" colspan="3">${proposal.clientContact || "—"}</td>
         </tr>
       </table>
 
       <table class="domestic-doc-table">
-        <thead>
-          <tr>
-            <th>No.</th>
-            <th>제품명</th>
-            <th>규격/용량</th>
-            <th>정상 소비자가<br>(VAT 포함)</th>
-            <th>공급률</th>
-            <th>공급단가<br>(VAT 별도)</th>
-            <th>수량</th>
-            <th>공급금액</th>
-            <th>VAT</th>
-            <th>합계금액</th>
-          </tr>
-        </thead>
         <tbody>
+          <tr class="domestic-doc-colhead">
+            <td>No.</td>
+            <td>제품명</td>
+            <td>규격/용량</td>
+            <td>정상 소비자가<br>(VAT 포함)</td>
+            <td>공급률</td>
+            <td>공급단가<br>(VAT 별도)</td>
+            <td>수량</td>
+            <td>공급금액</td>
+            <td>VAT</td>
+            <td>합계금액</td>
+          </tr>
           ${dataRows}
-        </tbody>
-        <tfoot>
           <tr class="domestic-doc-total">
             <td colspan="7">합계</td>
             <td class="num">${formatKrw(totalSupply)}</td>
             <td class="num">${formatKrw(totalVat)}</td>
             <td class="num">${formatKrw(totalGrand)}</td>
           </tr>
-        </tfoot>
+        </tbody>
       </table>
 
       ${

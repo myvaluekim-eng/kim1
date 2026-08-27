@@ -1353,6 +1353,7 @@ function bindProposalEvents() {
       terms,
       termsPresetName,
       clientContact: client?.contact || "",
+      staffName: document.getElementById("current-employee-name")?.textContent || "",
       recordType: "estimate",
     });
     showToast(`견적서 저장 완료 — v${version} (지난 단가표에서 확인)`);
