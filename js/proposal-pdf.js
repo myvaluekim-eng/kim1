@@ -389,6 +389,18 @@ function buildDomesticEstimateDocumentHtml(proposal) {
       </table>
 
       <table class="domestic-doc-table">
+        <colgroup>
+          <col style="width:4%">
+          <col style="width:17%">
+          <col style="width:10%">
+          <col style="width:11%">
+          <col style="width:7%">
+          <col style="width:11%">
+          <col style="width:6%">
+          <col style="width:11%">
+          <col style="width:10%">
+          <col style="width:13%">
+        </colgroup>
         <tbody>
           <tr class="domestic-doc-colhead">
             <td>No.</td>
@@ -412,17 +424,19 @@ function buildDomesticEstimateDocumentHtml(proposal) {
         </tbody>
       </table>
 
-      ${
-        terms.length
-          ? `
-      <div class="proposal-doc-terms">
-        <p class="proposal-doc-terms-title">거래 조건</p>
-        ${terms.map((t) => `<p>${t}</p>`).join("")}
-      </div>`
-          : ""
-      }
+      <div class="domestic-doc-bottom">
+        ${
+          terms.length
+            ? `
+        <div class="proposal-doc-terms">
+          <p class="proposal-doc-terms-title">거래 조건</p>
+          ${terms.map((t) => `<p>${t}</p>`).join("")}
+        </div>`
+            : ""
+        }
 
-      <p class="proposal-doc-footer">Barle Cosmetics · barle.co.kr</p>
+        <p class="proposal-doc-footer">Barle Cosmetics · barle.co.kr</p>
+      </div>
     </div>
   `;
 }
@@ -538,6 +552,8 @@ async function exportProposalToPdf(proposal) {
   container.innerHTML = isEstimate ? buildEstimateDocumentHtml(proposal) : buildProposalDocumentHtml(proposal);
   if (!isEstimate) {
     container.style.width = "2100px";
+  } else {
+    container.style.width = "1300px";
   }
   document.body.appendChild(container);
 
