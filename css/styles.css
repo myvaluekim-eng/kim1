@@ -1326,8 +1326,9 @@ tr.po-row-unmatched {
 }
 
 .settings-panel .setting-item-apply .btn {
-  width: 100%;
+  width: fit-content;
   height: 36px;
+  padding: 0 16px;
 }
 
 .settings-panel .setting-hint {
