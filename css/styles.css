@@ -1321,6 +1321,15 @@ tr.po-row-unmatched {
   background-position: right 14px center;
 }
 
+.settings-panel .setting-item-apply label {
+  visibility: hidden;
+}
+
+.settings-panel .setting-item-apply .btn {
+  width: 100%;
+  height: 44px;
+}
+
 .settings-panel .setting-hint {
   grid-column: 1 / -1;
   font-size: 13px;
