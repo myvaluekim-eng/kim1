@@ -1290,11 +1290,11 @@ tr.po-row-unmatched {
 
 .settings-panel .setting-item input {
   width: 100%;
-  height: 44px;
-  padding: 0 14px;
+  height: 36px;
+  padding: 0 12px;
   border: 1px solid #fcd34d;
-  border-radius: 10px;
-  font-size: 18px;
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 700;
   text-align: center;
   color: #92400e;
@@ -1303,11 +1303,11 @@ tr.po-row-unmatched {
 
 .settings-panel .setting-item select {
   width: 100%;
-  height: 44px;
-  padding: 0 32px 0 14px;
+  height: 36px;
+  padding: 0 28px 0 12px;
   border: 1px solid #fcd34d;
-  border-radius: 10px;
-  font-size: 16px;
+  border-radius: 8px;
+  font-size: 13px;
   font-weight: 700;
   text-align: center;
   text-align-last: center;
@@ -1318,7 +1318,7 @@ tr.po-row-unmatched {
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%2392400e' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
   background-repeat: no-repeat;
-  background-position: right 14px center;
+  background-position: right 12px center;
 }
 
 .settings-panel .setting-item-apply label {
@@ -1327,7 +1327,7 @@ tr.po-row-unmatched {
 
 .settings-panel .setting-item-apply .btn {
   width: 100%;
-  height: 44px;
+  height: 36px;
 }
 
 .settings-panel .setting-hint {

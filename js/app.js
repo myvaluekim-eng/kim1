@@ -1060,11 +1060,11 @@ function renderProposal() {
         </div>
         <div class="setting-item setting-item-apply">
           <label>&nbsp;</label>
-          <button type="button" class="btn btn-primary" id="btn-apply-rates">변경 적용</button>
+          <button type="button" class="btn btn-primary" id="btn-apply-rates">변경</button>
         </div>
         <p class="setting-hint">
           소비자가 × FOB 비율 = FOB 가격 · 환율로 원화/달러 동시 계산 · FOB·금액은 선택한 통화로 표시됩니다.
-          값을 바꾼 뒤 <strong>변경 적용</strong>을 눌러야 아래 제품에 반영됩니다.
+          값을 바꾼 뒤 <strong>변경</strong>을 눌러야 아래 제품에 반영됩니다.
         </p>
       </div>
     </div>
