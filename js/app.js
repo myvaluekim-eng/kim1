@@ -1220,6 +1220,9 @@ function bindProposalEvents() {
   document.getElementById("btn-apply-rates")?.addEventListener("click", () => {
     appData.exchangeRate = proposalState.exchangeRate;
     saveData(appData);
+    Object.values(proposalState.items).forEach((item) => {
+      item.fobRateOverride = proposalState.fobRate;
+    });
     render();
   });
 
